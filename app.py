@@ -2,8 +2,12 @@ import streamlit as st
 import os
 import re
 import random
+import time
+import json
+import pandas as pd
 from openai import OpenAI
 import plotly.graph_objects as go
+from collections import Counter
 
 # ================= 1. 配置区 =================
 os.environ["HTTP_PROXY"] = ""
@@ -23,12 +27,111 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # ================= 2. 状态初始化 =================
 st.set_page_config(page_title="急诊室疑云：2岁患儿的犬吠声", page_icon="🏥", layout="wide")
 
-ALL_CLUES = ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "白天感冒史", "三凹征"]
+# 🌟 教师仪表盘入口（侧边栏）
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 👨‍🏫 教师入口")
+if st.sidebar.button("📊 打开教师仪表盘"):
+    st.session_state.view_mode = "teacher"
+if st.sidebar.button("🎮 返回游戏"):
+    st.session_state.view_mode = "game"
+
+if "view_mode" not in st.session_state:
+    st.session_state.view_mode = "game"
+
+# 文件路径
+RECORDS_FILE = "game_records.json"
+
+# 🌟 教师仪表盘视图
+if st.session_state.view_mode == "teacher":
+    st.title("📊 儿科急诊模拟器 · 教师仪表盘")
+    st.markdown("该面板展示班级同学在游戏中的整体表现，用于教学效果评估。")
+    
+    if not os.path.exists(RECORDS_FILE):
+        st.warning("暂无数据。请让同学们至少完成一局游戏。")
+        st.stop()
+    
+    with open(RECORDS_FILE, "r", encoding="utf-8") as f:
+        records = json.load(f)
+    
+    if len(records) == 0:
+        st.warning("暂无数据。")
+        st.stop()
+    
+    total_plays = len(records)
+    avg_score = sum(r["score"] for r in records) / total_plays
+    max_score = max(r["score"] for r in records)
+    
+    # 核心指标卡
+    col1, col2, col3 = st.columns(3)
+    col1.metric("总测试人次", total_plays)
+    col2.metric("班级平均分", f"{avg_score:.1f} / 100")
+    col3.metric("最高分", f"{max_score} / 100")
+    
+    st.divider()
+    
+    # 1. 结局分布
+    st.subheader("🎬 结局分布")
+    title_counts = Counter(r["title"] for r in records)
+    title_df = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"])
+    st.bar_chart(title_df.set_index("结局称号"))
+    
+    # 2. 误诊方向分布
+    st.subheader("❌ 误诊方向分布（第三幕诊断）")
+    diagnosis_map = {
+        "A": "急性喉炎（正确）",
+        "B": "急性会厌炎（误诊）",
+        "C": "气道异物（误诊）",
+        "D": "支气管哮喘（误诊）"
+    }
+    diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
+    diag_df = pd.DataFrame(
+        [(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()],
+        columns=["诊断选择", "人数"]
+    )
+    st.bar_chart(diag_df.set_index("诊断选择"))
+    
+    # 3. 最常见操作失误排行
+    st.subheader("⚠️ 最常见操作失误 Top 5")
+    all_penalties = []
+    for r in records:
+        all_penalties.extend(r.get("penalties", []))
+    
+    if all_penalties:
+        penalty_counts = Counter(all_penalties)
+        penalty_df = pd.DataFrame(penalty_counts.most_common(5), columns=["失误操作", "频次"])
+        st.bar_chart(penalty_df.set_index("失误操作"))
+    else:
+        st.success("🎉 目前没有任何失误操作记录！")
+    
+    st.divider()
+    st.caption("💡 建议：教师可根据以上数据，在课堂上重点讲解高频误诊方向和失误操作。")
+    st.stop()
+
+# ================= 3. 游戏模式选择 =================
+if "game_mode" not in st.session_state:
+    st.title("🏥 急诊室疑云：2岁患儿的犬吠声")
+    st.markdown("### 请选择你的游戏难度：")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🌱 简单模式（适合新手）\n5个行动点，详细的引导和提示", width="stretch"):
+            st.session_state.game_mode = "easy"
+            st.rerun()
+    with col2:
+        st.markdown("### 🔥 困难模式（挑战极限）")
+        st.markdown("3个行动点，**无任务提示，盲盒线索，病情进展迅速**")
+        if st.button("开始困难模式挑战", type="primary", width="stretch"):
+            st.session_state.game_mode = "hard"
+            st.rerun()
+    st.stop()
+
+mode = st.session_state.game_mode
+initial_points = 5 if mode == "easy" else 3
+initial_trust = 40 if mode == "easy" else 20
 
 defaults = {
     "messages": [{"role": "assistant", "content": "医生！您快看看我家小雨！她半夜突然咳得像小狗叫一样，嗓子也哑了，我怎么哄都不行……白天就是有点流鼻涕，我给她喝了点感冒药，怎么会这样啊！"}],
-    "trust_score": 40,
-    "action_points": 5,
+    "trust_score": initial_trust,
+    "action_points": initial_points,
     "disease_progress": 30,
     "game_over": False,
     "time_period": 1,
@@ -56,13 +159,15 @@ defaults = {
     "excluded_diseases": [],
     "show_dog_cough_img": False,
     "show_stridor_img": False,
-    "show_depression_img": False
+    "show_depression_img": False,
+    "comm_made": False,
+    "last_action_time": time.time(),
+    "record_saved": False # 防止重复记录
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 🌟 自定义生命体征渲染函数
 def render_vital(label, value):
     st.markdown(
         f"""
@@ -78,14 +183,22 @@ def restart_game():
         del st.session_state[key]
     st.rerun()
 
-# ================= 3. 剧情配置区 =================
+# ================= 4. 剧情配置区 =================
+if mode == "easy":
+    task_text = "任务目标：安抚家长情绪，通过问诊了解咳嗽的声音特征和发病时间规律。"
+    hint_text = "💡 提示：先共情安抚（如“别急，送来得及时”），再切入问诊。"
+else:
+    task_text = "急诊室气氛紧张，家长情绪极度不稳定，患儿病情不明，你需要迅速做出判断。"
+    hint_text = "⚠️ 困难模式：无系统提示。请依靠临床经验，自主发掘病情。"
+
 SCENARIO_DATA = {
-    1: {"time": "凌晨 2:00", "title": "🎬 第一幕：急诊室初遇", "task": "任务目标：安抚家长情绪，通过问诊了解咳嗽的声音特征和发病时间规律。", "hint": "💡 提示：先共情安抚（如“别急，送来得及时”），再切入问诊。", "mode": "free"},
-    2: {"time": "凌晨 2:30", "title": "🎬 第二幕：初步判断", "task": "任务目标：是否立刻给患儿开检查？请做出你的临床决策。", "hint": "💡 提示：考虑患儿当前病情和检查的优先级。", "mode": "decision"},
-    3: {"time": "凌晨 2:45", "title": "🎬 第三幕：迷雾重重", "task": "任务目标：鉴别诊断。询问呼吸情况，并进行体格检查。注意排除会厌炎、异物、哮喘！", "hint": "💡 提示：重点关注“吸气性喉鸣”和“三凹征”，并针对性排除其他疾病。", "mode": "free"},
-    4: {"time": "凌晨 3:00", "title": "🎬 第四幕：生死时速", "task": "突发事件！患儿出现吸气性呼吸困难加重，面色发绀，SpO₂降至88%！请立即处理！", "hint": "💡 提示：请在3个行动点内，从下方操作中选择正确的紧急处理组合。至少需要2项正确操作！", "mode": "crisis"},
-    5: {"time": "凌晨 3:30", "title": "🎬 第五幕：带教老师介入", "task": "带教老师到场，询问你刚才的处理思路。你该如何回应？", "hint": "💡 提示：医患沟通与职业素养。", "mode": "decision"},
-    6: {"time": "凌晨 4:00", "title": "🎬 第六幕：结案复盘", "task": "任务目标：提交你的最终诊断。", "hint": "💡 提示：带教老师正在看着你。", "mode": "end"}
+    1: {"time": "凌晨 2:00", "title": "🎬 第一幕：急诊室初遇", "task": task_text, "hint": hint_text, "mode": "free"},
+    2: {"time": "凌晨 2:30", "title": "🎬 第二幕：初步判断", "task": "任务目标：是否立刻给患儿开检查？请做出你的临床决策。", "hint": "", "mode": "decision"},
+    3: {"time": "凌晨 2:45", "title": "🎬 第三幕：迷雾重重", "task": "任务目标：鉴别诊断。询问呼吸情况，并进行体格检查。", "hint": "", "mode": "free"},
+    4: {"time": "凌晨 3:00", "title": "🎬 第四幕：生死时速", "task": "突发事件！患儿出现吸气性呼吸困难加重，面色发绀，SpO₂降至88%！请立即处理！", "hint": "", "mode": "crisis"},
+    5: {"time": "凌晨 3:15", "title": "🎬 第五幕：医患沟通", "task": "患儿病情暂时稳定，但需要住院观察。家长情绪崩溃，你该如何沟通？", "hint": "", "mode": "communication"},
+    6: {"time": "凌晨 3:30", "title": "🎬 第六幕：带教老师介入", "task": "带教老师到场，询问你刚才的处理思路。你该如何回应？", "hint": "", "mode": "decision"},
+    7: {"time": "凌晨 4:00", "title": "🎬 第七幕：结案复盘", "task": "任务目标：提交你的最终诊断。", "hint": "", "mode": "end"}
 }
 
 DIAGNOSIS_OPTIONS = {
@@ -133,6 +246,12 @@ DECISIONS = {
     }
 }
 
+COMMUNICATION_OPTIONS = {
+    "A": {"label": "A. “别哭哭啼啼的，赶紧去办住院手续，别耽误治疗。”", "type": "cold", "trust_change": -10, "score": 0, "reply": "（家长愣住，强忍着眼泪去办手续，但眼神里充满了不信任。）"},
+    "B": {"label": "B. “病情很重，喉梗阻随时可能窒息，你们要做好心理准备。”", "type": "scare", "trust_change": -5, "score": 5, "reply": "（家长吓得浑身发抖，崩溃大哭，情绪极度不稳定。）"},
+    "C": {"label": "C. “您别自责，来得非常及时。喉炎起病急，但只要及时控制水肿，绝大多数孩子恢复得很好。请您相信我们。”", "type": "empathy", "trust_change": 15, "score": 15, "reply": "（家长擦了擦眼泪，用力点头，情绪逐渐平复，愿意积极配合治疗。）"}
+}
+
 ERROR_KNOWLEDGE = {
     "镇静剂": "❌ 错误操作：急性喉梗阻禁用镇静剂！镇静剂会抑制呼吸中枢，掩盖缺氧症状，极易导致呼吸骤停。正确做法：保持气道通畅、吸氧、雾化吸入肾上腺素。",
     "CT": "❌ 过度医疗：急性喉炎是临床诊断！不应等待CT或X线结果再处理，搬动患儿和长时间检查会加重喉水肿，延误抢救时机。",
@@ -140,7 +259,7 @@ ERROR_KNOWLEDGE = {
     "听诊：判断错误": "❌ 听诊错误：吸气性喉鸣（Stridor）提示上气道梗阻，常见于急性喉炎。呼气性哮鸣音（Wheezing）提示下气道梗阻，常见于哮喘。",
 }
 
-# ================= 4. 核心逻辑函数 =================
+# ================= 5. 核心逻辑函数 =================
 def get_local_reply(prompt, trust_score, period):
     if "小狗" in prompt or "犬吠" in prompt or "狗叫" in prompt:
         return "她咳起来'空空'的，像小狗叫一样，我从来没听过，吓死我了！"
@@ -156,12 +275,29 @@ def get_local_reply(prompt, trust_score, period):
         return "医生，您问这些到底有没有用啊？能不能先给孩子吸点氧？"
     return "医生，她嗓子哑了，哭都哭不出声，我该怎么办啊？"
 
+def check_time_pressure():
+    current_time = time.time()
+    elapsed = current_time - st.session_state.last_action_time
+    if elapsed > 60:
+        st.session_state.disease_progress = min(100, st.session_state.disease_progress + 5)
+        st.session_state.last_action_time = current_time
+        st.toast("⏰ 患儿病情在等待中加重了！病情 +5", icon="⏳")
+        return True
+    return False
+
 def advance_period(is_decision_phase=False):
     st.session_state.time_period += 1
-    st.session_state.action_points = 3 if st.session_state.time_period == 4 else 5
+    st.session_state.last_action_time = time.time()
+    
+    if st.session_state.time_period == 4:
+        st.session_state.action_points = 3
+    else:
+        st.session_state.action_points = 5 if mode == "easy" else 3
 
     if not is_decision_phase:
-        st.session_state.disease_progress += 10
+        progress_increase = 15 if mode == "hard" else 10
+        st.session_state.disease_progress += progress_increase
+        
         core_clues = ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "三凹征"]
         if not any(c in st.session_state.unlocked_clues for c in core_clues):
             st.session_state.disease_progress += 5
@@ -176,17 +312,17 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，吸气时胸骨上窝、锁骨上窝、肋间隙凹陷，喉鸣音加重！情况紧急！"})
 
-# ================= 5. 界面布局 =================
+# ================= 6. 界面布局 =================
 col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
 
 # ------------------ 左侧：生命体征与状态栏 ------------------
 with col_left:
     st.header("📋 急诊病历本")
-    st.caption(f"当前时间：{SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[6])['time']}")
+    st.caption(f"当前时间：{SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[7])['time']}")
     
     st.metric(label="❤️ 家长信任值", value=f"{st.session_state.trust_score} / 100")
     st.progress(st.session_state.trust_score / 100)
-    st.metric(label="⏳ 剩余行动点", value=f"{st.session_state.action_points} / 5")
+    st.metric(label="⏳ 剩余行动点", value=f"{st.session_state.action_points} / {5 if mode == 'easy' else 3}")
     
     st.divider()
     st.subheader("📈 实时生命体征")
@@ -208,7 +344,7 @@ with col_left:
         with c2:
             render_vital("心率", "140 次/分")
             render_vital("意识", "明显烦躁")
-        st.warning("⚠️ 出现三凹征，需立即干预")
+        if mode == "easy": st.warning("⚠️ 出现三凹征，需立即干预")
     elif dp < 90:
         c1, c2 = st.columns(2)
         with c1:
@@ -217,7 +353,8 @@ with col_left:
         with c2:
             render_vital("心率", "160 次/分")
             render_vital("意识", "发绀、烦躁")
-        st.error("🚨 喉梗阻加重，随时可能呼吸衰竭")
+        if mode == "easy": st.error("🚨 喉梗阻加重，随时可能呼吸衰竭")
+        st.toast("🚨 生命体征危急！请立即处理！", icon="🚨")
     else:
         c1, c2 = st.columns(2)
         with c1:
@@ -226,14 +363,16 @@ with col_left:
         with c2:
             render_vital("心率", "180 次/分")
             render_vital("意识", "意识模糊")
-        st.error("💀 极度危险！随时可能心跳骤停")
+        if mode == "easy": st.error("💀 极度危险！随时可能心跳骤停")
+        st.toast("💀 患儿濒死！请立即抢救！", icon="💀")
     
     st.divider()
     
     if not st.session_state.game_over:
         if st.session_state.time_period in [1, 3]:
             if st.session_state.time_period == 3 and st.session_state.action_points <= 2 and not st.session_state.diagnosis_processed:
-                st.warning("⚠️ 问诊结束。请给出初步诊断：")
+                if mode == "easy": st.warning("⚠️ 问诊结束。请给出初步诊断：")
+                else: st.warning("⚠️ 家长正焦急地看着你，请给出你的判断：")
                 for opt_key, opt in DIAGNOSIS_OPTIONS.items():
                     if st.button(opt["label"], key=f"diag_{opt_key}", width="stretch"):
                         st.session_state.diagnosis_processed = True
@@ -253,10 +392,30 @@ with col_left:
                     advance_period(is_decision_phase=False)
                     st.rerun()
             elif st.session_state.action_points > 2:
-                st.caption(f"💡 强制问诊阶段：还需进行 {st.session_state.action_points - 2} 次问诊。")
+                if mode == "easy": st.caption(f"💡 强制问诊阶段：还需进行 {st.session_state.action_points - 2} 次问诊。")
+                else: st.caption(f"⏳ 剩余问诊次数：{st.session_state.action_points}")
         
-        if st.session_state.time_period in [2, 5] and st.session_state.decision_made.get(st.session_state.time_period):
+        if st.session_state.time_period in [2, 6] and st.session_state.decision_made.get(st.session_state.time_period):
             if st.button("▶️ 继续剧情", width="stretch"):
+                advance_period(is_decision_phase=True)
+                st.rerun()
+        
+        if st.session_state.time_period == 5 and not st.session_state.comm_made:
+            st.warning("⚠️ 请选择你向家长交代病情的方式：")
+            for opt_key, opt in COMMUNICATION_OPTIONS.items():
+                if st.button(opt["label"], key=f"comm_{opt_key}", width="stretch"):
+                    st.session_state.comm_made = True
+                    st.session_state.score_empathy += opt["score"]
+                    st.session_state.trust_score = max(0, min(100, st.session_state.trust_score + opt["trust_change"]))
+                    st.session_state.messages.append({"role": "user", "content": f"【沟通】{opt['label']}"})
+                    st.session_state.messages.append({"role": "assistant", "content": opt["reply"]})
+                    if opt["type"] == "empathy": st.toast("✅ 共情沟通，信任值提升！", icon="❤️")
+                    elif opt["type"] == "scare": st.toast("⚠️ 过度恐吓，家长情绪崩溃！", icon="😭")
+                    else: st.toast("❌ 冷漠打发，信任值下降！", icon="💔")
+                    st.rerun()
+        
+        if st.session_state.time_period == 5 and st.session_state.comm_made:
+            if st.button("▶️ 进入下一幕", width="stretch"):
                 advance_period(is_decision_phase=True)
                 st.rerun()
         
@@ -272,12 +431,12 @@ with col_left:
             if st.button("✅ 进入第五幕", width="stretch"):
                 st.session_state.score_emergency += min(25, st.session_state.crisis_correct_count * 10)
                 st.session_state.time_period = 5
-                st.session_state.action_points = 5
-                st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸逐渐平稳。带教老师赶到现场...）"})
+                st.session_state.action_points = 5 if mode == "easy" else 3
+                st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸逐渐平稳。家长情绪激动，你需要交代病情...）"})
                 st.rerun()
     
     st.divider()
-    if not st.session_state.game_over and st.session_state.time_period >= 5:
+    if not st.session_state.game_over and st.session_state.time_period >= 6:
         if st.button("📝 提交诊断，结束游戏", width="stretch"):
             st.session_state.game_over = True
             st.rerun()
@@ -289,47 +448,64 @@ with col_left:
 
 # ------------------ 右侧：线索夹与体征图库 ------------------
 with col_right:
-    st.header("🔍 线索夹")
-    if len(st.session_state.unlocked_clues) == 0:
-        st.info("暂无线索，快去问诊吧！")
-    else:
-        for clue in ALL_CLUES:
-            if clue in st.session_state.unlocked_clues:
-                st.success(f"✅ {clue}")
+    with st.expander("🔍 线索夹与体征图库（点击展开）", expanded=True):
+        st.header("🔍 线索夹")
+        if mode == "hard":
+            st.caption("⚠️ 困难模式：线索处于隐藏状态，需自行探索解锁。")
+            if len(st.session_state.unlocked_clues) == 0:
+                st.info("暂无已解锁线索。")
             else:
-                st.text(f"🔒 未知线索")
-                
-    st.divider()
-    st.subheader("🖼️ 体征图库")
-    if not st.session_state.unlocked_clues:
-        st.caption("解锁线索后，将在此显示对应体征图片。")
-    else:
-        if "犬吠样咳嗽" in st.session_state.unlocked_clues and os.path.exists("dog_cough.jpg"):
-            st.image("dog_cough.jpg", caption="犬吠样咳嗽特征", width=300)
-        if "吸气性喉鸣" in st.session_state.unlocked_clues and os.path.exists("stridor.jpg"):
-            st.image("stridor.jpg", caption="吸气性喉鸣听诊波形", width=300)
-        if "三凹征" in st.session_state.unlocked_clues and os.path.exists("three_depressions.jpg"):
-            st.image("three_depressions.jpg", caption="患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷", width=350)
-    
-    if st.session_state.penalty_log:
+                for i, clue in enumerate(ALL_CLUES):
+                    if clue in st.session_state.unlocked_clues:
+                        st.success(f"✅ 线索 {i+1}：{clue}")
+                    else:
+                        st.text(f"🔒 未知线索 {i+1}/5")
+        else:
+            if len(st.session_state.unlocked_clues) == 0:
+                st.info("暂无线索，快去问诊吧！")
+            else:
+                for clue in ALL_CLUES:
+                    if clue in st.session_state.unlocked_clues:
+                        st.success(f"✅ {clue}")
+                    else:
+                        st.text(f"🔒 未知线索")
+                    
         st.divider()
-        st.caption("📝 操作记录")
-        for log in st.session_state.penalty_log:
-            st.warning(f"⚠️ {log}")
+        st.subheader("🖼️ 体征图库")
+        if not st.session_state.unlocked_clues:
+            st.caption("解锁线索后，将在此显示对应体征图片。")
+        else:
+            if "犬吠样咳嗽" in st.session_state.unlocked_clues and os.path.exists("dog_cough.jpg"):
+                st.image("dog_cough.jpg", caption="犬吠样咳嗽特征", width=300)
+            if "吸气性喉鸣" in st.session_state.unlocked_clues and os.path.exists("stridor.jpg"):
+                st.image("stridor.jpg", caption="吸气性喉鸣听诊波形", width=300)
+            if "三凹征" in st.session_state.unlocked_clues and os.path.exists("three_depressions.jpg"):
+                st.image("three_depressions.jpg", caption="患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷", width=350)
+        
+        if st.session_state.penalty_log:
+            st.divider()
+            st.caption("📝 操作记录")
+            for log in st.session_state.penalty_log:
+                st.warning(f"⚠️ {log}")
 
 # ------------------ 中间：主对话界面与查体 ------------------
 with col_center:
     if not st.session_state.game_over:
-        current_scenario = SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[6])
+        current_scenario = SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[7])
         st.title(current_scenario["title"])
         st.info(f"**{current_scenario['task']}**\n\n{current_scenario['hint']}")
     else:
         st.title("🏥 午夜急诊 · 结案")
 
+    if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] in ["free", "decision", "crisis", "communication"]:
+        if check_time_pressure():
+            pass
+
     # 体格检查工具箱
     if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
         with st.expander("🩺 体格检查工具箱（点击展开，消耗行动点）", expanded=False):
-            st.caption("💡 儿科急诊查体原则：先安抚，后检查；先救命，后诊病。")
+            if mode == "easy":
+                st.caption("💡 儿科急诊查体原则：先安抚，后检查；先救命，后诊病。")
             tab1, tab2, tab3, tab4 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊", "🥁 叩诊"])
             
             with tab1:
@@ -366,7 +542,6 @@ with col_center:
                         st.session_state.disease_progress = min(100, st.session_state.disease_progress + 5)
                         st.rerun()
 
-    # 听诊模式 VS 正常对话模式
     if st.session_state.auscultation_mode:
         st.warning("🩺 你戴上听诊器，请仔细听诊患儿的呼吸音：")
         if os.path.exists("stridor.mp3"):
@@ -402,12 +577,12 @@ with col_center:
                 with st.chat_message(msg["role"]):
                     st.write(msg["content"])
 
-        # 决策模式按钮
         if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "decision":
             decision_key = 1 if st.session_state.time_period == 2 else 2
             if not st.session_state.decision_made.get(st.session_state.time_period):
                 decision = DECISIONS[decision_key]
-                st.warning(f"⚠️ {decision['prompt']}")
+                if mode == "easy": st.warning(f"⚠️ {decision['prompt']}")
+                else: st.warning("⚠️ 请立刻做出你的临床决策：")
                 for opt_key, opt in decision["options"].items():
                     if st.button(opt["label"], key=f"dec_{st.session_state.time_period}_{opt_key}", width="stretch"):
                         st.session_state.decision_made[st.session_state.time_period] = opt_key
@@ -419,7 +594,6 @@ with col_center:
                             st.session_state.penalty_log.append(f"决策失误：{opt['label'][:8]}...")
                         st.rerun()
 
-        # 紧急处理模式按钮
         elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
             st.warning("⚠️ 请从下列操作中选择紧急处理方案（消耗行动点）：")
             if st.session_state.action_points > 0:
@@ -450,19 +624,19 @@ with col_center:
                     st.session_state.game_over = True
                     st.rerun()
 
-        # 自由问诊输入框
         elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
             if st.session_state.time_period == 3 and st.session_state.action_points <= 2 and not st.session_state.diagnosis_processed:
-                st.info("👉 请根据现有线索，在左侧做出初步诊断。")
+                if mode == "easy": st.info("👉 请根据现有线索，在左侧做出初步诊断。")
+                else: st.info("👉 时间紧迫，请根据你的专业判断给出诊断。")
             else:
                 if prompt := st.chat_input("请输入你的问诊、查体或检查操作..."):
                     if st.session_state.action_points <= 0:
                         st.warning("行动点已用完！请点击左侧『进入下一幕』。")
                     else:
                         st.session_state.action_points -= 1
+                        st.session_state.last_action_time = time.time()
                         st.session_state.messages.append({"role": "user", "content": prompt})
                         
-                        # 关键词拦截听诊
                         if any(k in prompt for k in ["听诊", "听呼吸", "听肺"]):
                             if not st.session_state.auscultation_completed:
                                 st.session_state.auscultation_mode = True
@@ -471,7 +645,6 @@ with col_center:
                                 st.session_state.messages.append({"role": "assistant", "content": "（你已经听过了，患儿现在很烦躁，不宜反复听诊。）"})
                                 st.rerun()
                         
-                        # 成就追踪
                         if st.session_state.time_period == 1 and any(k in prompt for k in ["小狗", "犬吠", "狗叫", "咳嗽声音"]):
                             st.session_state.first_act_clue = True
                         if any(k in prompt for k in ["流口水", "吞咽", "会厌"]):
@@ -485,7 +658,6 @@ with col_center:
                                 st.session_state.achievements.append("千金难买早知道")
                                 st.toast("🎉 解锁成就：千金难买早知道！", icon="🏅")
 
-                        # 动态病情判断
                         trust_change = 0
                         disease_change = 5
                         clue = "无"
@@ -515,7 +687,6 @@ with col_center:
                         
                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + disease_change))
                         
-                        # 调用 AI
                         reply_text = None
                         try:
                             tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
@@ -527,7 +698,6 @@ with col_center:
                         
                         if not reply_text: reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
                         
-                        # 强制防智障过滤
                         bad_phrases = ["宝宝", "妈妈对不起", "咱们要坚强", "乖", "妈妈在", "吓坏妈妈", "那么厉害", "谢谢你啊"]
                         if any(k in reply_text for k in bad_phrases) or len(reply_text) < 5:
                             reply_text = "医生，呜呜，她咳得喘不上气，您快救救她吧！"
@@ -552,7 +722,7 @@ with col_center:
                                 st.session_state.achievements.append("反面教材")
                         st.rerun()
 
-# ================= 6. 游戏结算与复盘 =================
+# ================= 7. 游戏结算与复盘 =================
 if st.session_state.game_over:
     st.divider()
     st.header("🩺 带教老师复盘")
@@ -573,8 +743,26 @@ if st.session_state.game_over:
         elif st.session_state.final_score >= 70: st.session_state.final_title = "🌟 有潜力的住院医"
         elif st.session_state.final_score >= 50: st.session_state.final_title = "📚 还需回炉重造"
         else: st.session_state.final_title = "😡 小雨妈妈已向医务科投诉"
+        
+        # 🌟 记录数据到本地文件（仅记录一次）
+        if not st.session_state.record_saved:
+            record = {
+                "score": st.session_state.final_score,
+                "title": st.session_state.final_title,
+                "diagnosis": st.session_state.diagnosis_made,
+                "penalties": list(set(st.session_state.penalty_log)), # 去重
+                "mode": mode
+            }
+            if os.path.exists(RECORDS_FILE):
+                with open(RECORDS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = []
+            data.append(record)
+            with open(RECORDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            st.session_state.record_saved = True
     
-    # 1. AI 带教老师点评
     if st.session_state.final_evaluation is None:
         with st.spinner("带教老师正在复盘..."):
             chat_history = "\n".join([f"{'医生' if m['role']=='user' else '家属'}: {m['content']}" for m in st.session_state.messages])
@@ -588,7 +776,6 @@ if st.session_state.game_over:
     else:
         st.info(st.session_state.final_evaluation)
     
-    # 2. 个人能力雷达图
     st.divider()
     st.subheader("📊 个人能力雷达图")
     s_empathy_final = min(15, st.session_state.score_empathy + (st.session_state.trust_score * 0.1))
@@ -611,7 +798,6 @@ if st.session_state.game_over:
     )
     st.plotly_chart(fig, width="stretch")
 
-    # 3. 动态诊断树复盘
     st.divider()
     st.subheader("🌳 动态诊断树复盘")
     has_laryngitis = st.session_state.diagnosis_made == "A"
@@ -628,7 +814,6 @@ if st.session_state.game_over:
     tree_text += f"    └── 哮喘 {'❌ (你问了过敏史，排除)' if excluded_asthma else '⚠️ (未评估风险)'}\n"
     st.code(tree_text, language="text")
 
-    # 4. 错题本
     st.divider()
     st.subheader("📝 错题本与知识点复盘")
     if not st.session_state.penalty_log:
@@ -645,7 +830,6 @@ if st.session_state.game_over:
             if not matched:
                 st.info("💡 临床提示：请回顾该操作是否违背了急诊“先救命、后治病”的原则。")
 
-    # 5. 成就展示
     st.divider()
     st.subheader("🏆 隐藏成就")
     if not st.session_state.achievements:
