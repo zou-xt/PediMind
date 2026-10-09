@@ -25,52 +25,66 @@ BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 页面初始化与深色医疗风UI（修复版） =================
+# ================= 2. 页面初始化与深色医疗风UI（全修复版） =================
 st.set_page_config(page_title="急诊室疑云：2岁患儿的犬吠声", page_icon="🏥", layout="wide")
 
 st.markdown("""
 <style>
-    /* 🌟 强制全局文本颜色，解决深色背景看不清的问题 */
-    .stApp { 
-        background: linear-gradient(135deg, #0f1c2e 0%, #1a2a42 50%, #0f1c2e 100%); 
-        color: #e2e8f0 !important; 
-    }
-    /* 强制设置所有文本（p, span, div）颜色 */
+    /* 🌟 全局背景与文本强制高对比度 */
+    .stApp { background: linear-gradient(135deg, #0f1c2e 0%, #1a2a42 50%, #0f1c2e 100%); color: #e2e8f0 !important; }
     p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
-    /* 列表项 */
     li { color: #cbd5e0 !important; }
     
-    /* 🌟 聊天框内字体颜色（修正AI回复看不清的问题） */
+    /* 🌟 核心修复：侧边栏深色背景 */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f1c2e 0%, #1a2a42 100%) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    section[data-testid="stSidebar"] * {
+        color: #e2e8f0 !important;
+    }
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        color: #ffffff !important;
+    }
+    section[data-testid="stSidebar"] .stButton>button {
+        border: 1px solid rgba(99, 179, 237, 0.4) !important;
+        background: linear-gradient(135deg, rgba(99, 179, 237, 0.15), rgba(99, 179, 237, 0.05)) !important;
+        color: #e2e8f0 !important;
+    }
+    section[data-testid="stSidebar"] .stButton>button:hover {
+        background: linear-gradient(135deg, rgba(99, 179, 237, 0.3), rgba(99, 179, 237, 0.1)) !important;
+        border: 1px solid rgba(99, 179, 237, 0.7) !important;
+    }
+    button[data-testid="baseButton-headerNoPadding"] { color: #ffffff !important; }
+
+    /* 🌟 聊天框与文本输入框 */
     div[data-testid="stChatMessage"] { 
         background-color: rgba(255, 255, 255, 0.08) !important; 
-        border-radius: 12px; 
-        padding: 15px; 
-        border: 1px solid rgba(255, 255, 255, 0.1); 
-        margin-bottom: 10px;
+        border-radius: 12px; padding: 15px; 
+        border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px;
     }
     div[data-testid="stChatMessage"] p { color: #ffffff !important; }
-
-    /* 🌟 输入框（聊天输入） */
     div[data-testid="stChatInput"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(99, 179, 237, 0.4) !important; }
     div[data-testid="stChatInput"] textarea { color: #ffffff !important; }
     div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
 
-    /* 🌟 信息/警告/错误提示框（强制背景色和字体色） */
+    /* 🌟 弹窗/信息提示框 */
     div[data-testid="stAlert"] { 
         background-color: rgba(255, 255, 255, 0.05) !important; 
-        border-radius: 12px; 
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);
     }
     div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
     div[data-testid="stAlert"] svg { fill: #63b3ed !important; }
 
-    /* 🌟 展开菜单（工具箱等） */
-    div[data-testid="stExpander"] details { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
-    div[data-testid="stExpander"] summary { color: #ffffff !important; font-weight: bold; }
-    
-    /* 🌟 标题和副标题 */
-    .game-main-title { text-align: center; font-size: 44px; font-weight: 900; background: linear-gradient(90deg, #63b3ed, #f56565, #63b3ed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 20px; margin-bottom: 10px; letter-spacing: 3px; }
-    .game-sub-title { text-align: center; font-size: 18px; color: #a0aec0 !important; margin-bottom: 40px; }
+    /* 🌟 展开菜单（工具箱/线索夹） */
+    div[data-testid="stExpander"] { background-color: transparent !important; }
+    div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
+    div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
+    div[data-testid="stExpander"] > details > summary:hover { color: #63b3ed !important; }
+    div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; color: #ffffff !important; }
+    div[data-testid="stExpander"] > details > div { background-color: transparent !important; }
     
     /* 🌟 模式卡片 */
     .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; backdrop-filter: blur(10px); transition: all 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
@@ -85,14 +99,14 @@ st.markdown("""
     .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #68d391 !important; font-weight: bold; font-size: 16px; }
     .hard-card .feature-list li:before { content: "⚡"; color: #fc8181 !important; }
     
-    /* 🌟 顶部状态徽章栏 */
+    /* 🌟 顶部状态条 */
     .status-bar { display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
     .status-badge { flex: 1; min-width: 150px; background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
     .status-label { font-size: 12px; color: #a0aec0 !important; margin-bottom: 6px; }
     .status-value { font-size: 22px; font-weight: 800; }
     .status-trust .status-value { color: #63b3ed !important; } .status-action .status-value { color: #f6e05e !important; } .status-disease .status-value { color: #f56565 !important; }
     
-    /* 🌟 按钮 */
+    /* 🌟 按钮通用样式 */
     .stButton>button { border-radius: 12px !important; border: 1px solid rgba(99, 179, 237, 0.4) !important; background: linear-gradient(135deg, rgba(99, 179, 237, 0.15), rgba(99, 179, 237, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; transition: all 0.3s ease !important; padding: 12px 20px !important; }
     .stButton>button:hover { background: linear-gradient(135deg, rgba(99, 179, 237, 0.3), rgba(99, 179, 237, 0.1)) !important; border: 1px solid rgba(99, 179, 237, 0.7) !important; box-shadow: 0 0 20px rgba(99, 179, 237, 0.3) !important; }
     
