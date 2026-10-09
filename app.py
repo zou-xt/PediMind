@@ -62,6 +62,17 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# 🌟 自定义生命体征渲染函数
+def render_vital(label, value):
+    st.markdown(
+        f"""
+        <div style="margin-bottom: 8px;">
+            <div style="font-size: 12px; color: #888;">{label}</div>
+            <div style="font-size: 16px; font-weight: 600; color: #333;">{value}</div>
+        </div>
+        """, unsafe_allow_html=True
+    )
+
 def restart_game():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
@@ -84,7 +95,6 @@ DIAGNOSIS_OPTIONS = {
     "D": {"label": "D. 支气管哮喘", "is_correct": False, "score": 0, "disease_change": 15, "reply": "❌ 误诊！患儿表现为吸气性呼吸困难（喉鸣），而非呼气性呼吸困难（哮鸣），且无过敏史。误诊导致病情进一步恶化！"}
 }
 
-# 🌟 听诊反馈改为启发式引导
 AUSCULTATION_OPTIONS = {
     "A": {"label": "A. 吸气性喉鸣（Stridor）", "is_correct": True, "feedback": "✅ 正确！你听到了典型的吸气性喉鸣，这提示上气道梗阻。结合患儿‘犬吠样咳嗽’和‘夜间加重’的病史，你考虑最可能的诊断是什么？请继续收集线索，准备在第三幕给出你的初步诊断吧！"},
     "B": {"label": "B. 呼气性哮鸣音（Wheezing）", "is_correct": False, "feedback": "❌ 错误！你听到的是吸气性喉鸣，而不是呼气性哮鸣音。哮鸣音多见于哮喘或细支气管炎。"},
@@ -184,30 +194,38 @@ with col_left:
     
     if dp < 40:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "97%")
-        c2.metric("心率(次/分)", "120")
-        c1.metric("呼吸(次/分)", "28")
-        c2.metric("意识", "轻度烦躁")
+        with c1:
+            render_vital("SpO₂", "97%")
+            render_vital("呼吸", "28 次/分")
+        with c2:
+            render_vital("心率", "120 次/分")
+            render_vital("意识", "轻度烦躁")
     elif dp < 70:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "93%")
-        c2.metric("心率(次/分)", "140")
-        c1.metric("呼吸(次/分)", "35")
-        c2.metric("意识", "明显烦躁")
+        with c1:
+            render_vital("SpO₂", "93%")
+            render_vital("呼吸", "35 次/分")
+        with c2:
+            render_vital("心率", "140 次/分")
+            render_vital("意识", "明显烦躁")
         st.warning("⚠️ 出现三凹征，需立即干预")
     elif dp < 90:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "88%")
-        c2.metric("心率(次/分)", "160")
-        c1.metric("呼吸(次/分)", "45")
-        c2.metric("意识", "发绀、烦躁")
+        with c1:
+            render_vital("SpO₂", "88%")
+            render_vital("呼吸", "45 次/分")
+        with c2:
+            render_vital("心率", "160 次/分")
+            render_vital("意识", "发绀、烦躁")
         st.error("🚨 喉梗阻加重，随时可能呼吸衰竭")
     else:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "82%")
-        c2.metric("心率(次/分)", "180")
-        c1.metric("呼吸(次/分)", "55")
-        c2.metric("意识", "意识模糊")
+        with c1:
+            render_vital("SpO₂", "82%")
+            render_vital("呼吸", "55 次/分")
+        with c2:
+            render_vital("心率", "180 次/分")
+            render_vital("意识", "意识模糊")
         st.error("💀 极度危险！随时可能心跳骤停")
     
     st.divider()
