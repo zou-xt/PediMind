@@ -180,7 +180,7 @@ defaults = {
     "show_depression_img": False,
     "comm_made": False,
     "last_action_time": time.time(),
-    "crisis_start_time": time.time(), # 🌟 新增倒计时记录时间
+    "crisis_start_time": time.time(),
     "record_saved": False
 }
 for k, v in defaults.items():
@@ -442,7 +442,7 @@ with col_left:
                 st.session_state.time_period = 4
                 st.session_state.action_points = 3 
                 st.session_state.disease_progress = max(70, st.session_state.disease_progress + 10)
-                st.session_state.crisis_start_time = time.time() # 🌟 记录开始时间
+                st.session_state.crisis_start_time = time.time()
                 st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重，面色发绀）医生！她喘不上气了！"})
                 st.rerun()
         
@@ -610,30 +610,29 @@ with col_center:
                             st.session_state.penalty_log.append(f"决策失误：{opt['label'][:8]}...")
                         st.rerun()
 
-        # 🌟 第四幕：生死时速（含倒计时与视觉缓冲）
+        # 🌟 第四幕：生死时速（含倒计时、视觉缓冲和音频警报）
         elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
-            # 1. 动态计算倒计时
             time_limit = 60 if mode == "hard" else 90
             elapsed = time.time() - st.session_state.crisis_start_time
             time_left = max(0, time_limit - int(elapsed))
             
-            # 2. 视觉缓冲区：进度条与文字警报
             st.warning("⚠️ 请从下列操作中选择紧急处理方案（每个操作消耗1个行动点，共3个行动点）：")
             st.progress(max(0.0, 1.0 - (elapsed / time_limit)))
             
             if time_left <= 15:
                 st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！时间不多了，请立即决断！")
+                # 🌟 触发音频警报
+                if os.path.exists("alarm.mp3"):
+                    st.audio("alarm.mp3", format="audio/mp3", autoplay=True)
             else:
                 st.info(f"⏰ 紧急抢救倒计时：{time_left} 秒")
                 
-            # 3. 超时判罚
             if time_left <= 0:
                 st.session_state.disease_progress = 100
                 st.session_state.game_over = True
                 st.session_state.messages.append({"role": "assistant", "content": "（抢救超时！患儿出现严重窒息，心跳骤停！）"})
                 st.rerun()
 
-            # 4. 原有操作按钮逻辑
             if st.session_state.action_points > 0:
                 for act_key, act in CRISIS_ACTIONS.items():
                     if act_key not in st.session_state.crisis_actions:
@@ -725,10 +724,32 @@ with col_center:
                         
                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + disease_change))
                         
+                        # 🌟 提取最近 3 轮对话历史
+                        history_text = ""
+                        for msg in st.session_state.messages[-6:]:
+                            role = "医生" if msg["role"] == "user" else "家属"
+                            history_text += f"{role}: {msg['content']}\n"
+                        
                         reply_text = None
                         try:
                             tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
-                            ai_prompt = f"你是2岁急性喉炎患儿的妈妈，在急诊室跟医生对话。情绪:{tone_prompt}。事实:前天白天流鼻涕，凌晨1点半突发犬吠样咳嗽。铁律：1.对医生说话，禁止对宝宝自言自语。2.句子必须完整，逻辑通顺。3.回复在50字以内。医生问：'{prompt}'。请直接回答医生："
+                            # 🌟 将历史对话注入 Prompt
+                            ai_prompt = f"""
+                            你是2岁急性喉炎患儿的妈妈，在急诊室跟医生对话。
+                            当前情绪：{tone_prompt}。
+                            剧本事实：前天白天流鼻涕，凌晨1点半突发犬吠样咳嗽。
+                            
+                            【对话历史】
+                            {history_text}
+                            
+                            【对话铁律】
+                            1.对医生说话，禁止对宝宝自言自语。
+                            2.句子必须完整，逻辑通顺。
+                            3.回复在50字以内。
+                            
+                            医生刚刚说：'{prompt}'
+                            请直接回答医生：
+                            """
                             ai_response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": ai_prompt}], temperature=0.4, timeout=3)
                             reply_text = ai_response.choices[0].message.content.strip()
                         except Exception:
