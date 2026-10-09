@@ -12,7 +12,9 @@ os.environ["NO_PROXY"] = "*"
 # ⚠️ 请在本地测试时替换为你的真实 API Key。如果部署到 Streamlit Cloud，请确保在 Secrets 中配置了 ZHIPU_API_KEY。
 try:
     API_KEY = st.secrets["ZHIPU_API_KEY"]
-    
+except Exception:
+    # 本地未配置 secrets.toml 时的兜底
+    API_KEY = "sk-你的真实智谱AI密钥"    
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 
