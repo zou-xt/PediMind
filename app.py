@@ -27,23 +27,12 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 # ================= 2. 页面初始化与UI美化 =================
 st.set_page_config(page_title="急诊室疑云：2岁患儿的犬吠声", page_icon="🏥", layout="wide")
 
-# 🌟 全局 CSS 美化
 st.markdown("""
 <style>
     .stApp { background-color: #f8f9fa; }
-    .game-main-title {
-        text-align: center; font-size: 38px; font-weight: 800;
-        color: #1f3a5f; margin-top: 20px; margin-bottom: 5px; letter-spacing: 2px;
-    }
-    .game-sub-title {
-        text-align: center; font-size: 20px; color: #6c757d; margin-bottom: 40px;
-    }
-    .mode-card {
-        padding: 25px; border-radius: 16px;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.08);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        margin-bottom: 20px; height: 100%;
-    }
+    .game-main-title { text-align: center; font-size: 38px; font-weight: 800; color: #1f3a5f; margin-top: 20px; margin-bottom: 5px; letter-spacing: 2px; }
+    .game-sub-title { text-align: center; font-size: 20px; color: #6c757d; margin-bottom: 40px; }
+    .mode-card { padding: 25px; border-radius: 16px; box-shadow: 0 8px 16px rgba(0,0,0,0.08); transition: transform 0.3s ease, box-shadow 0.3s ease; margin-bottom: 20px; height: 100%; }
     .mode-card:hover { transform: translateY(-5px); box-shadow: 0 12px 20px rgba(0,0,0,0.12); }
     .easy-card { background: linear-gradient(145deg, #ffffff, #f0fff4); border: 2px solid #48bb78; }
     .hard-card { background: linear-gradient(145deg, #ffffff, #fff5f5); border: 2px solid #e53e3e; }
@@ -74,6 +63,7 @@ if "game_mode" not in st.session_state:
                 <li>初始信任值 40（家长相对配合）</li>
                 <li>明确的任务目标和操作提示</li>
                 <li>病情进展较慢，容错率高</li>
+                <li>第四幕抢救限时 90 秒</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -90,6 +80,7 @@ if "game_mode" not in st.session_state:
                 <li>初始信任值 20（家长极度暴躁）</li>
                 <li>无任务提示，盲盒线索</li>
                 <li>病情进展迅速，极易触发 Bad Ending</li>
+                <li>第四幕抢救限时 60 秒</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -103,7 +94,6 @@ mode = st.session_state.game_mode
 initial_points = 5 if mode == "easy" else 3
 initial_trust = 40 if mode == "easy" else 20
 
-# 🌟 教师仪表盘入口（侧边栏）
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 👨‍🏫 教师入口")
 if st.sidebar.button("📊 打开教师仪表盘"):
@@ -116,43 +106,34 @@ if "view_mode" not in st.session_state:
 
 RECORDS_FILE = "game_records.json"
 
-# 🌟 教师仪表盘视图
 if st.session_state.view_mode == "teacher":
     st.title("📊 儿科急诊模拟器 · 教师仪表盘")
     st.markdown("该面板展示班级同学在游戏中的整体表现，用于教学效果评估。")
-    
     if not os.path.exists(RECORDS_FILE):
         st.warning("暂无数据。请让同学们至少完成一局游戏。")
         st.stop()
-    
     with open(RECORDS_FILE, "r", encoding="utf-8") as f:
         records = json.load(f)
-    
     if len(records) == 0:
         st.warning("暂无数据。")
         st.stop()
-    
     total_plays = len(records)
     avg_score = sum(r["score"] for r in records) / total_plays
     max_score = max(r["score"] for r in records)
-    
     col1, col2, col3 = st.columns(3)
     col1.metric("总测试人次", total_plays)
     col2.metric("班级平均分", f"{avg_score:.1f} / 100")
     col3.metric("最高分", f"{max_score} / 100")
-    
     st.divider()
     st.subheader("🎬 结局分布")
     title_counts = Counter(r["title"] for r in records)
     title_df = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"])
     st.bar_chart(title_df.set_index("结局称号"))
-    
     st.subheader("❌ 误诊方向分布（第三幕诊断）")
     diagnosis_map = {"A": "急性喉炎（正确）", "B": "急性会厌炎（误诊）", "C": "气道异物（误诊）", "D": "支气管哮喘（误诊）"}
     diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
     diag_df = pd.DataFrame([(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()], columns=["诊断选择", "人数"])
     st.bar_chart(diag_df.set_index("诊断选择"))
-    
     st.subheader("⚠️ 最常见操作失误 Top 5")
     all_penalties = []
     for r in records:
@@ -199,6 +180,7 @@ defaults = {
     "show_depression_img": False,
     "comm_made": False,
     "last_action_time": time.time(),
+    "crisis_start_time": time.time(), # 🌟 新增倒计时记录时间
     "record_saved": False
 }
 for k, v in defaults.items():
@@ -328,6 +310,7 @@ def advance_period(is_decision_phase=False):
     
     if st.session_state.time_period == 4:
         st.session_state.action_points = 3
+        st.session_state.crisis_start_time = time.time() # 🌟 初始化倒计时
     else:
         st.session_state.action_points = 5 if mode == "easy" else 3
 
@@ -352,11 +335,9 @@ def advance_period(is_decision_phase=False):
 # ================= 7. 界面布局 =================
 col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
 
-# ------------------ 左侧：生命体征与状态栏 ------------------
 with col_left:
     st.header("📋 急诊病历本")
     st.caption(f"当前时间：{SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[7])['time']}")
-    
     st.metric(label="❤️ 家长信任值", value=f"{st.session_state.trust_score} / 100")
     st.progress(st.session_state.trust_score / 100)
     st.metric(label="⏳ 剩余行动点", value=f"{st.session_state.action_points} / {5 if mode == 'easy' else 3}")
@@ -461,6 +442,7 @@ with col_left:
                 st.session_state.time_period = 4
                 st.session_state.action_points = 3 
                 st.session_state.disease_progress = max(70, st.session_state.disease_progress + 10)
+                st.session_state.crisis_start_time = time.time() # 🌟 记录开始时间
                 st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重，面色发绀）医生！她喘不上气了！"})
                 st.rerun()
         
@@ -483,7 +465,6 @@ with col_left:
     if st.button("🔄 重新开始游戏", use_container_width=True):
         restart_game()
 
-# ------------------ 右侧：线索夹与体征图库 ------------------
 with col_right:
     with st.expander("🔍 线索夹与体征图库（点击展开）", expanded=True):
         st.header("🔍 线索夹")
@@ -525,7 +506,6 @@ with col_right:
             for log in st.session_state.penalty_log:
                 st.warning(f"⚠️ {log}")
 
-# ------------------ 中间：主对话界面与查体 ------------------
 with col_center:
     if not st.session_state.game_over:
         current_scenario = SCENARIO_DATA.get(st.session_state.time_period, SCENARIO_DATA[7])
@@ -538,7 +518,6 @@ with col_center:
         if check_time_pressure():
             pass
 
-    # 体格检查工具箱
     if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
         with st.expander("🩺 体格检查工具箱（点击展开，消耗行动点）", expanded=False):
             if mode == "easy":
@@ -631,8 +610,30 @@ with col_center:
                             st.session_state.penalty_log.append(f"决策失误：{opt['label'][:8]}...")
                         st.rerun()
 
+        # 🌟 第四幕：生死时速（含倒计时与视觉缓冲）
         elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
-            st.warning("⚠️ 请从下列操作中选择紧急处理方案（消耗行动点）：")
+            # 1. 动态计算倒计时
+            time_limit = 60 if mode == "hard" else 90
+            elapsed = time.time() - st.session_state.crisis_start_time
+            time_left = max(0, time_limit - int(elapsed))
+            
+            # 2. 视觉缓冲区：进度条与文字警报
+            st.warning("⚠️ 请从下列操作中选择紧急处理方案（每个操作消耗1个行动点，共3个行动点）：")
+            st.progress(max(0.0, 1.0 - (elapsed / time_limit)))
+            
+            if time_left <= 15:
+                st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！时间不多了，请立即决断！")
+            else:
+                st.info(f"⏰ 紧急抢救倒计时：{time_left} 秒")
+                
+            # 3. 超时判罚
+            if time_left <= 0:
+                st.session_state.disease_progress = 100
+                st.session_state.game_over = True
+                st.session_state.messages.append({"role": "assistant", "content": "（抢救超时！患儿出现严重窒息，心跳骤停！）"})
+                st.rerun()
+
+            # 4. 原有操作按钮逻辑
             if st.session_state.action_points > 0:
                 for act_key, act in CRISIS_ACTIONS.items():
                     if act_key not in st.session_state.crisis_actions:
