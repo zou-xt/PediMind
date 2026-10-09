@@ -287,13 +287,13 @@ with col_center:
 
     # 🌟 图片展示区（如果有图片，在这里展现）
     if st.session_state.show_dog_cough_img:
-        if os.path.exists("dog_cough.png"):
+        if os.path.exists("dog_cough.jpg"):
             st.image("dog_cough.png", caption="犬吠样咳嗽特征", width=350)
     if st.session_state.show_stridor_img:
-        if os.path.exists("stridor.png"):
+        if os.path.exists("stridor.jpg"):
             st.image("stridor.png", caption="吸气性喉鸣音波形图", width=350)
     if st.session_state.show_depression_img:
-        if os.path.exists("three_depressions.png"):
+        if os.path.exists("three_depressions.jpg"):
             st.image("three_depressions.png", caption="三凹征示意图", width=450)
 
     # 体格检查工具箱
