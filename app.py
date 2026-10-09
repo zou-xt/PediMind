@@ -24,8 +24,84 @@ MODEL_NAME = "glm-4-flash"
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 状态初始化 =================
+# ================= 2. 页面初始化与UI美化 =================
 st.set_page_config(page_title="急诊室疑云：2岁患儿的犬吠声", page_icon="🏥", layout="wide")
+
+# 🌟 全局 CSS 美化
+st.markdown("""
+<style>
+    .stApp { background-color: #f8f9fa; }
+    .game-main-title {
+        text-align: center; font-size: 38px; font-weight: 800;
+        color: #1f3a5f; margin-top: 20px; margin-bottom: 5px; letter-spacing: 2px;
+    }
+    .game-sub-title {
+        text-align: center; font-size: 20px; color: #6c757d; margin-bottom: 40px;
+    }
+    .mode-card {
+        padding: 25px; border-radius: 16px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        margin-bottom: 20px; height: 100%;
+    }
+    .mode-card:hover { transform: translateY(-5px); box-shadow: 0 12px 20px rgba(0,0,0,0.12); }
+    .easy-card { background: linear-gradient(145deg, #ffffff, #f0fff4); border: 2px solid #48bb78; }
+    .hard-card { background: linear-gradient(145deg, #ffffff, #fff5f5); border: 2px solid #e53e3e; }
+    .card-title { font-size: 26px; font-weight: bold; text-align: center; margin-bottom: 15px; }
+    .easy-title { color: #2f855a; }
+    .hard-title { color: #c53030; }
+    .card-desc { font-size: 15px; color: #4a5568; line-height: 1.6; margin-bottom: 15px; }
+    .feature-list { list-style-type: none; padding-left: 0; }
+    .feature-list li { font-size: 14px; color: #2d3748; margin-bottom: 8px; padding-left: 20px; position: relative; }
+    .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #48bb78; font-weight: bold; }
+    .hard-card .feature-list li:before { content: "⚡"; color: #e53e3e; }
+</style>
+""", unsafe_allow_html=True)
+
+# ================= 3. 游戏模式选择 =================
+if "game_mode" not in st.session_state:
+    st.markdown('<div class="game-main-title">🏥 急诊室疑云</div>', unsafe_allow_html=True)
+    st.markdown('<div class="game-sub-title">2岁患儿的犬吠声 · 请选择你的游戏难度</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2, gap="large")
+    with col1:
+        st.markdown("""
+        <div class="mode-card easy-card">
+            <div class="card-title easy-title">🌱 简单模式</div>
+            <div class="card-desc">适合新手。拥有充足的行动点，系统提供详细的引导和提示，助你稳步成长。</div>
+            <ul class="feature-list">
+                <li>5 个行动点</li>
+                <li>初始信任值 40（家长相对配合）</li>
+                <li>明确的任务目标和操作提示</li>
+                <li>病情进展较慢，容错率高</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("开始简单模式", use_container_width=True, type="primary"):
+            st.session_state.game_mode = "easy"
+            st.rerun()
+    with col2:
+        st.markdown("""
+        <div class="mode-card hard-card">
+            <div class="card-title hard-title">🔥 困难模式</div>
+            <div class="card-desc">挑战极限。模拟真实急诊室的极端压力，考验你的临床直觉与决策能力。</div>
+            <ul class="feature-list">
+                <li>3 个行动点</li>
+                <li>初始信任值 20（家长极度暴躁）</li>
+                <li>无任务提示，盲盒线索</li>
+                <li>病情进展迅速，极易触发 Bad Ending</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("开始困难模式挑战", use_container_width=True, type="primary"):
+            st.session_state.game_mode = "hard"
+            st.rerun()
+    st.stop()
+
+# ================= 4. 状态初始化与基础函数 =================
+mode = st.session_state.game_mode
+initial_points = 5 if mode == "easy" else 3
+initial_trust = 40 if mode == "easy" else 20
 
 # 🌟 教师仪表盘入口（侧边栏）
 st.sidebar.markdown("---")
@@ -38,7 +114,6 @@ if st.sidebar.button("🎮 返回游戏"):
 if "view_mode" not in st.session_state:
     st.session_state.view_mode = "game"
 
-# 文件路径
 RECORDS_FILE = "game_records.json"
 
 # 🌟 教师仪表盘视图
@@ -61,72 +136,34 @@ if st.session_state.view_mode == "teacher":
     avg_score = sum(r["score"] for r in records) / total_plays
     max_score = max(r["score"] for r in records)
     
-    # 核心指标卡
     col1, col2, col3 = st.columns(3)
     col1.metric("总测试人次", total_plays)
     col2.metric("班级平均分", f"{avg_score:.1f} / 100")
     col3.metric("最高分", f"{max_score} / 100")
     
     st.divider()
-    
-    # 1. 结局分布
     st.subheader("🎬 结局分布")
     title_counts = Counter(r["title"] for r in records)
     title_df = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"])
     st.bar_chart(title_df.set_index("结局称号"))
     
-    # 2. 误诊方向分布
     st.subheader("❌ 误诊方向分布（第三幕诊断）")
-    diagnosis_map = {
-        "A": "急性喉炎（正确）",
-        "B": "急性会厌炎（误诊）",
-        "C": "气道异物（误诊）",
-        "D": "支气管哮喘（误诊）"
-    }
+    diagnosis_map = {"A": "急性喉炎（正确）", "B": "急性会厌炎（误诊）", "C": "气道异物（误诊）", "D": "支气管哮喘（误诊）"}
     diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
-    diag_df = pd.DataFrame(
-        [(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()],
-        columns=["诊断选择", "人数"]
-    )
+    diag_df = pd.DataFrame([(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()], columns=["诊断选择", "人数"])
     st.bar_chart(diag_df.set_index("诊断选择"))
     
-    # 3. 最常见操作失误排行
     st.subheader("⚠️ 最常见操作失误 Top 5")
     all_penalties = []
     for r in records:
         all_penalties.extend(r.get("penalties", []))
-    
     if all_penalties:
         penalty_counts = Counter(all_penalties)
         penalty_df = pd.DataFrame(penalty_counts.most_common(5), columns=["失误操作", "频次"])
         st.bar_chart(penalty_df.set_index("失误操作"))
     else:
         st.success("🎉 目前没有任何失误操作记录！")
-    
-    st.divider()
-    st.caption("💡 建议：教师可根据以上数据，在课堂上重点讲解高频误诊方向和失误操作。")
     st.stop()
-
-# ================= 3. 游戏模式选择 =================
-if "game_mode" not in st.session_state:
-    st.title("🏥 急诊室疑云：2岁患儿的犬吠声")
-    st.markdown("### 请选择你的游戏难度：")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🌱 简单模式（适合新手）\n5个行动点，详细的引导和提示", width="stretch"):
-            st.session_state.game_mode = "easy"
-            st.rerun()
-    with col2:
-        st.markdown("### 🔥 困难模式（挑战极限）")
-        st.markdown("3个行动点，**无任务提示，盲盒线索，病情进展迅速**")
-        if st.button("开始困难模式挑战", type="primary", width="stretch"):
-            st.session_state.game_mode = "hard"
-            st.rerun()
-    st.stop()
-
-mode = st.session_state.game_mode
-initial_points = 5 if mode == "easy" else 3
-initial_trust = 40 if mode == "easy" else 20
 
 defaults = {
     "messages": [{"role": "assistant", "content": "医生！您快看看我家小雨！她半夜突然咳得像小狗叫一样，嗓子也哑了，我怎么哄都不行……白天就是有点流鼻涕，我给她喝了点感冒药，怎么会这样啊！"}],
@@ -162,7 +199,7 @@ defaults = {
     "show_depression_img": False,
     "comm_made": False,
     "last_action_time": time.time(),
-    "record_saved": False # 防止重复记录
+    "record_saved": False
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -183,7 +220,7 @@ def restart_game():
         del st.session_state[key]
     st.rerun()
 
-# ================= 4. 剧情配置区 =================
+# ================= 5. 剧情配置区 =================
 if mode == "easy":
     task_text = "任务目标：安抚家长情绪，通过问诊了解咳嗽的声音特征和发病时间规律。"
     hint_text = "💡 提示：先共情安抚（如“别急，送来得及时”），再切入问诊。"
@@ -259,7 +296,7 @@ ERROR_KNOWLEDGE = {
     "听诊：判断错误": "❌ 听诊错误：吸气性喉鸣（Stridor）提示上气道梗阻，常见于急性喉炎。呼气性哮鸣音（Wheezing）提示下气道梗阻，常见于哮喘。",
 }
 
-# ================= 5. 核心逻辑函数 =================
+# ================= 6. 核心逻辑函数 =================
 def get_local_reply(prompt, trust_score, period):
     if "小狗" in prompt or "犬吠" in prompt or "狗叫" in prompt:
         return "她咳起来'空空'的，像小狗叫一样，我从来没听过，吓死我了！"
@@ -312,7 +349,7 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，吸气时胸骨上窝、锁骨上窝、肋间隙凹陷，喉鸣音加重！情况紧急！"})
 
-# ================= 6. 界面布局 =================
+# ================= 7. 界面布局 =================
 col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
 
 # ------------------ 左侧：生命体征与状态栏 ------------------
@@ -722,7 +759,7 @@ with col_center:
                                 st.session_state.achievements.append("反面教材")
                         st.rerun()
 
-# ================= 7. 游戏结算与复盘 =================
+# ================= 8. 游戏结算与复盘 =================
 if st.session_state.game_over:
     st.divider()
     st.header("🩺 带教老师复盘")
@@ -744,13 +781,12 @@ if st.session_state.game_over:
         elif st.session_state.final_score >= 50: st.session_state.final_title = "📚 还需回炉重造"
         else: st.session_state.final_title = "😡 小雨妈妈已向医务科投诉"
         
-        # 🌟 记录数据到本地文件（仅记录一次）
         if not st.session_state.record_saved:
             record = {
                 "score": st.session_state.final_score,
                 "title": st.session_state.final_title,
                 "diagnosis": st.session_state.diagnosis_made,
-                "penalties": list(set(st.session_state.penalty_log)), # 去重
+                "penalties": list(set(st.session_state.penalty_log)),
                 "mode": mode
             }
             if os.path.exists(RECORDS_FILE):
