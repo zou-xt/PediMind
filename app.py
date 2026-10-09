@@ -9,8 +9,10 @@ os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
 os.environ["NO_PROXY"] = "*"
 
-# ⚠️ 请替换为你刚刚测试成功的智谱AI API Key
-API_KEY = st.secrets["ZHIPU_API_KEY"]
+# ⚠️ 请在本地测试时替换为你的真实 API Key。如果部署到 Streamlit Cloud，请确保在 Secrets 中配置了 ZHIPU_API_KEY。
+try:
+    API_KEY = st.secrets["ZHIPU_API_KEY"]
+    
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 
@@ -71,7 +73,6 @@ DIAGNOSIS_OPTIONS = {
     "D": {"label": "D. 支气管哮喘", "is_correct": False, "score": 0, "disease_change": 15, "reply": "❌ 误诊！患儿表现为吸气性呼吸困难（喉鸣），而非呼气性呼吸困难（哮鸣），且无过敏史。误诊导致病情进一步恶化！"}
 }
 
-# 🌟 修复：删除了所有 label 里的 ✅ 和 ❌
 CRISIS_ACTIONS = {
     "correct_1": {"label": "保持气道通畅：让患儿保持坐位/半坐位，避免哭闹加重喉水肿", "is_correct": True, "feedback": "（你让患儿保持坐位，呼吸稍有缓解）"},
     "correct_2": {"label": "氧疗：面罩吸氧", "is_correct": True, "feedback": "（面罩吸氧后，SpO₂开始缓慢回升）"},
@@ -502,12 +503,21 @@ with col_center:
                     reply_text = None
                     try:
                         tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
+                        
+                        # 🌟 强化版 Prompt，加入了“绝对铁律”防止复读
                         ai_prompt = f"""
                         你正在扮演一个【2岁急性喉炎患儿的妈妈】，在医院急诊室。你当前的情绪状态是：{tone_prompt}。
                         
                         【剧本事实设定，必须严格遵守】
                         患儿小雨，2岁3个月。发病时间线是：前天白天只有轻微流鼻涕，凌晨1点半左右突然出现犬吠样咳嗽、声音嘶哑。之后症状在夜间进行性加重。
-                        **绝对不能说“今天早上”、“昨天早上”等错误时间！必须回答“半夜”、“凌晨1点多”。**
+                        
+                        【对话绝对铁律】（非常重要，违反将导致游戏崩溃）
+                        1. 你的任务是根据医生【刚刚问的问题】进行回答。
+                        2. **禁止在每一句话里都重复“像小狗叫一样咳嗽”！** 只有当医生明确问“咳嗽声音”、“什么声音”、“怎么咳”的时候，你才能回答“像小狗叫/空空声”。
+                        3. 如果医生问“什么时候”、“几点”，你只回答“凌晨1点多”或“半夜”，绝对不能提狗叫。
+                        4. 如果医生问“有没有吃药”，你回答“吃了感冒药但没用”。
+                        5. 如果医生问“白天情况”，你回答“白天只是流鼻涕，没干别的事”。
+                        6. 如果医生问“吸气有没有喉鸣”，你回答“有吱吱声”。
                         
                         当前信任值：{st.session_state.trust_score}（低则急躁不配合，高则信任感激）。
                         医生刚刚说："{prompt}"
@@ -529,6 +539,12 @@ with col_center:
                     
                     if not reply_text:
                         reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
+                    
+                    # 🌟 代码级拦截：如果医生问的不是咳嗽声音，但 AI 非要提小狗叫，就强行替换掉！
+                    if not any(k in prompt for k in ["小狗", "犬吠", "狗叫", "咳嗽声音", "什么样的咳"]):
+                        reply_text = reply_text.replace("像小狗叫一样", "").replace("像小狗叫", "").replace("狗叫一样", "").replace("小狗叫", "")
+                        if len(reply_text.strip()) < 5:
+                            reply_text = "医生，哎呀，我太着急了，您刚才问什么？"
                     
                     if any(k in reply_text for k in ["小狗", "犬吠", "狗叫"]):
                         if "犬吠样咳嗽" not in st.session_state.unlocked_clues:
