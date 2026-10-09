@@ -129,6 +129,7 @@ ERROR_KNOWLEDGE = {
     "听诊：判断错误": "❌ 听诊错误：吸气性喉鸣（Stridor）提示上气道梗阻，常见于急性喉炎。呼气性哮鸣音（Wheezing）提示下气道梗阻，常见于哮喘。",
 }
 
+# ================= 4. 核心逻辑函数 =================
 def get_local_reply(prompt, trust_score, period):
     if "小狗" in prompt or "犬吠" in prompt or "狗叫" in prompt:
         return "她咳起来'空空'的，像小狗叫一样，我从来没听过，吓死我了！"
@@ -206,7 +207,7 @@ with col_left:
             if st.session_state.time_period == 3 and st.session_state.action_points <= 2 and not st.session_state.diagnosis_processed:
                 st.warning("⚠️ 问诊结束。请给出初步诊断：")
                 for opt_key, opt in DIAGNOSIS_OPTIONS.items():
-                    if st.button(opt["label"], key=f"diag_{opt_key}", use_container_width=True):
+                    if st.button(opt["label"], key=f"diag_{opt_key}", width="stretch"):
                         st.session_state.diagnosis_processed = True
                         st.session_state.diagnosis_made = opt_key
                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + opt["disease_change"]))
@@ -220,19 +221,19 @@ with col_left:
                         st.session_state.messages.append({"role": "assistant", "content": opt["reply"]})
                         st.rerun()
             elif st.session_state.action_points <= 2 and (st.session_state.time_period == 1 or st.session_state.diagnosis_processed):
-                if st.button("▶️ 进入下一幕", use_container_width=True):
+                if st.button("▶️ 进入下一幕", width="stretch"):
                     advance_period(is_decision_phase=False)
                     st.rerun()
             elif st.session_state.action_points > 2:
                 st.caption(f"💡 强制问诊阶段：还需进行 {st.session_state.action_points - 2} 次问诊。")
         
         if st.session_state.time_period in [2, 5] and st.session_state.decision_made.get(st.session_state.time_period):
-            if st.button("▶️ 继续剧情", use_container_width=True):
+            if st.button("▶️ 继续剧情", width="stretch"):
                 advance_period(is_decision_phase=True)
                 st.rerun()
         
         if st.session_state.time_period == 3 and st.session_state.diagnosis_processed and st.session_state.action_points <= 2:
-            if st.button("🚨 突发事件！进入第四幕", use_container_width=True):
+            if st.button("🚨 突发事件！进入第四幕", width="stretch"):
                 st.session_state.time_period = 4
                 st.session_state.action_points = 3 
                 st.session_state.disease_progress = max(70, st.session_state.disease_progress + 10)
@@ -240,7 +241,7 @@ with col_left:
                 st.rerun()
         
         if st.session_state.time_period == 4 and st.session_state.crisis_correct_count >= 2:
-            if st.button("✅ 进入第五幕", use_container_width=True):
+            if st.button("✅ 进入第五幕", width="stretch"):
                 st.session_state.score_emergency += min(25, st.session_state.crisis_correct_count * 10)
                 st.session_state.time_period = 5
                 st.session_state.action_points = 5
@@ -249,16 +250,16 @@ with col_left:
     
     st.divider()
     if not st.session_state.game_over and st.session_state.time_period >= 5:
-        if st.button("📝 提交诊断，结束游戏", use_container_width=True):
+        if st.button("📝 提交诊断，结束游戏", width="stretch"):
             st.session_state.game_over = True
             st.rerun()
     elif not st.session_state.game_over:
         st.caption("💡 后期才会开放提交诊断")
     
-    if st.button("🔄 重新开始游戏", use_container_width=True):
+    if st.button("🔄 重新开始游戏", width="stretch"):
         restart_game()
 
-# ------------------ 右侧：线索夹 ------------------
+# ------------------ 右侧：线索夹与体征图库 ------------------
 with col_right:
     st.header("🔍 线索夹")
     if len(st.session_state.unlocked_clues) == 0:
@@ -269,6 +270,18 @@ with col_right:
                 st.success(f"✅ {clue}")
             else:
                 st.text(f"🔒 未知线索")
+                
+    st.divider()
+    st.subheader("🖼️ 体征图库")
+    if not st.session_state.unlocked_clues:
+        st.caption("解锁线索后，将在此显示对应体征图片。")
+    else:
+        if "犬吠样咳嗽" in st.session_state.unlocked_clues and os.path.exists("dog_cough.jpg"):
+            st.image("dog_cough.jpg", caption="犬吠样咳嗽特征", width=300)
+        if "吸气性喉鸣" in st.session_state.unlocked_clues and os.path.exists("stridor.jpg"):
+            st.image("stridor.jpg", caption="吸气性喉鸣听诊波形", width=300)
+        if "三凹征" in st.session_state.unlocked_clues and os.path.exists("three_depressions.jpg"):
+            st.image("three_depressions.jpg", caption="三凹征：吸气时胸骨上窝、锁骨上窝、肋间隙凹陷", width=350)
     
     if st.session_state.penalty_log:
         st.divider()
@@ -285,17 +298,6 @@ with col_center:
     else:
         st.title("🏥 午夜急诊 · 结案")
 
-    # 🌟 图片展示区（如果有图片，在这里展现）
-    if st.session_state.show_dog_cough_img:
-        if os.path.exists("dog_cough.jpg"):
-            st.image("dog_cough.png", caption="犬吠样咳嗽特征", width=350)
-    if st.session_state.show_stridor_img:
-        if os.path.exists("stridor.jpg"):
-            st.image("stridor.png", caption="吸气性喉鸣音波形图", width=350)
-    if st.session_state.show_depression_img:
-        if os.path.exists("three_depressions.jpg"):
-            st.image("three_depressions.png", caption="三凹征示意图", width=450)
-
     # 体格检查工具箱
     if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
         with st.expander("🩺 体格检查工具箱（点击展开，消耗行动点）", expanded=False):
@@ -311,7 +313,6 @@ with col_center:
                         if "三凹征" not in st.session_state.unlocked_clues:
                             st.session_state.unlocked_clues.append("三凹征")
                         st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                        st.session_state.show_depression_img = True # 🌟 触发图片显示
                         st.rerun()
             with tab2:
                 if st.button("喉部听诊（音频判断）", key="aus_larynx"):
@@ -345,13 +346,12 @@ with col_center:
         else:
             st.info("🔇 未找到本地音频文件 'stridor.mp3'。请想象：吸气时出现高调、粗糙的'吱吱'声...")
         
-        # 🌟 触发听诊图片
-        if os.path.exists("stridor.png"):
-            st.image("stridor.png", caption="吸气性喉鸣音波形图", width=350)
+        if os.path.exists("stridor.jpg"):
+            st.image("stridor.jpg", caption="吸气性喉鸣音波形图", width=350)
             
         st.write("请判断你听到的是什么呼吸音：")
         for opt_key, opt in AUSCULTATION_OPTIONS.items():
-            if st.button(opt["label"], key=f"aus_{opt_key}", use_container_width=True):
+            if st.button(opt["label"], key=f"aus_{opt_key}", width="stretch"):
                 st.session_state.auscultation_mode = False
                 st.session_state.auscultation_completed = True
                 st.session_state.messages.append({"role": "user", "content": f"【听诊】{opt['label']}"})
@@ -381,7 +381,7 @@ with col_center:
                 decision = DECISIONS[decision_key]
                 st.warning(f"⚠️ {decision['prompt']}")
                 for opt_key, opt in decision["options"].items():
-                    if st.button(opt["label"], key=f"dec_{st.session_state.time_period}_{opt_key}", use_container_width=True):
+                    if st.button(opt["label"], key=f"dec_{st.session_state.time_period}_{opt_key}", width="stretch"):
                         st.session_state.decision_made[st.session_state.time_period] = opt_key
                         st.session_state.messages.append({"role": "user", "content": f"【决策】{opt['label']}"})
                         st.session_state.messages.append({"role": "assistant", "content": opt["reply"]})
@@ -397,7 +397,7 @@ with col_center:
             if st.session_state.action_points > 0:
                 for act_key, act in CRISIS_ACTIONS.items():
                     if act_key not in st.session_state.crisis_actions:
-                        if st.button(act["label"], key=f"crisis_{act_key}", use_container_width=True):
+                        if st.button(act["label"], key=f"crisis_{act_key}", width="stretch"):
                             st.session_state.action_points -= 1
                             st.session_state.crisis_actions.append(act_key)
                             st.session_state.messages.append({"role": "user", "content": act["label"]})
@@ -443,21 +443,15 @@ with col_center:
                                 st.session_state.messages.append({"role": "assistant", "content": "（你已经听过了，患儿现在很烦躁，不宜反复听诊。）"})
                                 st.rerun()
                         
-                        # 成就追踪：第一幕问出犬吠样咳嗽
+                        # 成就追踪
                         if st.session_state.time_period == 1 and any(k in prompt for k in ["小狗", "犬吠", "狗叫", "咳嗽声音"]):
                             st.session_state.first_act_clue = True
-                        
-                        # 成就追踪：排除三大疾病
                         if any(k in prompt for k in ["流口水", "吞咽", "会厌"]):
-                            if "会厌炎" not in st.session_state.excluded_diseases:
-                                st.session_state.excluded_diseases.append("会厌炎")
+                            if "会厌炎" not in st.session_state.excluded_diseases: st.session_state.excluded_diseases.append("会厌炎")
                         if any(k in prompt for k in ["呛", "异物", "吃东西"]):
-                            if "异物" not in st.session_state.excluded_diseases:
-                                st.session_state.excluded_diseases.append("异物")
+                            if "异物" not in st.session_state.excluded_diseases: st.session_state.excluded_diseases.append("异物")
                         if any(k in prompt for k in ["喘", "哮喘", "过敏"]):
-                            if "哮喘" not in st.session_state.excluded_diseases:
-                                st.session_state.excluded_diseases.append("哮喘")
-                        
+                            if "哮喘" not in st.session_state.excluded_diseases: st.session_state.excluded_diseases.append("哮喘")
                         if len(st.session_state.excluded_diseases) == 3:
                             if "千金难买早知道" not in st.session_state.achievements:
                                 st.session_state.achievements.append("千金难买早知道")
@@ -476,14 +470,14 @@ with col_center:
                         if any(k in prompt for k in ["小狗", "犬吠", "狗叫", "咳嗽声音", "什么样的咳"]):
                             clue = "犬吠样咳嗽"; disease_change = -5
                             st.session_state.score_inquiry = min(30, st.session_state.score_inquiry + 8)
-                            st.session_state.show_dog_cough_img = True # 🌟 触发狗叫图片
+                            st.session_state.show_dog_cough_img = True
                         elif any(k in prompt for k in ["什么时候", "几点", "时间", "加重", "晚上", "半夜", "凌晨"]):
                             clue = "夜间加重"; disease_change = -5
                             st.session_state.score_inquiry = min(30, st.session_state.score_inquiry + 8)
                         elif any(k in prompt for k in ["吸气", "呼吸声", "喉鸣", "喘气声"]):
                             clue = "吸气性喉鸣"; disease_change = -10
                             st.session_state.score_inquiry = min(30, st.session_state.score_inquiry + 8)
-                            st.session_state.show_stridor_img = True # 🌟 触发喉鸣图片
+                            st.session_state.show_stridor_img = True
                         elif any(k in prompt for k in ["白天", "之前", "前几天", "感冒"]):
                             clue = "白天感冒史"; disease_change = 0
                             st.session_state.score_inquiry = min(30, st.session_state.score_inquiry + 6)
@@ -497,18 +491,20 @@ with col_center:
                         reply_text = None
                         try:
                             tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
-                            ai_prompt = f"你扮演2岁急性喉炎患儿妈妈。当前情绪:{tone_prompt}。剧本事实:前天白天流鼻涕，凌晨1点半突发犬吠样咳嗽。绝对禁止每句都重复“小狗叫”！医生刚刚说：'{prompt}'。请用50字以内口语化回复，可带哭腔。"
-                            ai_response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": ai_prompt}], temperature=0.8, timeout=3)
+                            ai_prompt = f"你是2岁急性喉炎患儿的妈妈，在急诊室跟医生对话。情绪:{tone_prompt}。事实:前天白天流鼻涕，凌晨1点半突发犬吠样咳嗽。铁律：1.对医生说话，禁止对宝宝自言自语。2.句子必须完整，逻辑通顺。3.回复在50字以内。医生问：'{prompt}'。请直接回答医生："
+                            ai_response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": ai_prompt}], temperature=0.4, timeout=3)
                             reply_text = ai_response.choices[0].message.content.strip()
                         except Exception:
                             reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
                         
                         if not reply_text: reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
                         
-                        # 防复读机过滤
-                        if not any(k in prompt for k in ["小狗", "犬吠", "狗叫", "咳嗽声音", "什么样的咳"]):
-                            reply_text = reply_text.replace("像小狗叫一样", "").replace("像小狗叫", "").replace("狗叫一样", "").replace("小狗叫", "")
-                            if len(reply_text.strip()) < 5: reply_text = "医生，哎呀，我太着急了，您刚才问什么？"
+                        # 强制防智障过滤
+                        bad_phrases = ["宝宝", "妈妈对不起", "咱们要坚强", "乖", "妈妈在", "吓坏妈妈", "那么厉害", "谢谢你啊"]
+                        if any(k in reply_text for k in bad_phrases) or len(reply_text) < 5:
+                            reply_text = "医生，呜呜，她咳得喘不上气，您快救救她吧！"
+                        if len(reply_text) > 60:
+                            reply_text = reply_text[:60] + "..."
                         
                         if any(k in reply_text for k in ["小狗", "犬吠", "狗叫"]):
                             if "犬吠样咳嗽" not in st.session_state.unlocked_clues: clue = "犬吠样咳嗽"
@@ -564,7 +560,7 @@ if st.session_state.game_over:
     else:
         st.info(st.session_state.final_evaluation)
     
-    # 2. 🌟 个人能力雷达图
+    # 2. 个人能力雷达图
     st.divider()
     st.subheader("📊 个人能力雷达图")
     s_empathy_final = min(15, st.session_state.score_empathy + (st.session_state.trust_score * 0.1))
@@ -585,9 +581,9 @@ if st.session_state.game_over:
         height=400,
         margin=dict(l=40, r=40, t=20, b=20)
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
-    # 3. 🌟 动态诊断树复盘
+    # 3. 动态诊断树复盘
     st.divider()
     st.subheader("🌳 动态诊断树复盘")
     has_laryngitis = st.session_state.diagnosis_made == "A"
