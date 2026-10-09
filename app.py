@@ -84,7 +84,7 @@ DIAGNOSIS_OPTIONS = {
     "D": {"label": "D. 支气管哮喘", "is_correct": False, "score": 0, "disease_change": 15, "reply": "❌ 误诊！患儿表现为吸气性呼吸困难（喉鸣），而非呼气性呼吸困难（哮鸣），且无过敏史。误诊导致病情进一步恶化！"}
 }
 
-# 🌟 更新：听诊反馈改为启发式引导
+# 🌟 听诊反馈改为启发式引导
 AUSCULTATION_OPTIONS = {
     "A": {"label": "A. 吸气性喉鸣（Stridor）", "is_correct": True, "feedback": "✅ 正确！你听到了典型的吸气性喉鸣，这提示上气道梗阻。结合患儿‘犬吠样咳嗽’和‘夜间加重’的病史，你考虑最可能的诊断是什么？请继续收集线索，准备在第三幕给出你的初步诊断吧！"},
     "B": {"label": "B. 呼气性哮鸣音（Wheezing）", "is_correct": False, "feedback": "❌ 错误！你听到的是吸气性喉鸣，而不是呼气性哮鸣音。哮鸣音多见于哮喘或细支气管炎。"},
@@ -178,7 +178,7 @@ with col_left:
     st.progress(st.session_state.trust_score / 100)
     st.metric(label="⏳ 剩余行动点", value=f"{st.session_state.action_points} / 5")
     
-        st.divider()
+    st.divider()
     st.subheader("📈 实时生命体征")
     dp = st.session_state.disease_progress
     
