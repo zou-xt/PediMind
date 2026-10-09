@@ -44,6 +44,15 @@ st.markdown("""
     .feature-list li { font-size: 14px; color: #2d3748; margin-bottom: 8px; padding-left: 20px; position: relative; }
     .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #48bb78; font-weight: bold; }
     .hard-card .feature-list li:before { content: "⚡"; color: #e53e3e; }
+    
+    /* 🌟 移动端适配 CSS */
+    @media (max-width: 768px) {
+        /* 隐藏左右两栏 */
+        div[data-testid="column"]:nth-of-type(1) { display: none; }
+        div[data-testid="column"]:nth-of-type(3) { display: none; }
+        /* 让中间栏占满屏幕 */
+        div[data-testid="column"]:nth-of-type(2) { width: 100% !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -310,7 +319,7 @@ def advance_period(is_decision_phase=False):
     
     if st.session_state.time_period == 4:
         st.session_state.action_points = 3
-        st.session_state.crisis_start_time = time.time() # 🌟 初始化倒计时
+        st.session_state.crisis_start_time = time.time()
     else:
         st.session_state.action_points = 5 if mode == "easy" else 3
 
@@ -610,7 +619,6 @@ with col_center:
                             st.session_state.penalty_log.append(f"决策失误：{opt['label'][:8]}...")
                         st.rerun()
 
-        # 🌟 第四幕：生死时速（含倒计时、视觉缓冲和音频警报）
         elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
             time_limit = 60 if mode == "hard" else 90
             elapsed = time.time() - st.session_state.crisis_start_time
@@ -621,7 +629,6 @@ with col_center:
             
             if time_left <= 15:
                 st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！时间不多了，请立即决断！")
-                # 🌟 触发音频警报
                 if os.path.exists("alarm.mp3"):
                     st.audio("alarm.mp3", format="audio/mp3", autoplay=True)
             else:
@@ -724,7 +731,6 @@ with col_center:
                         
                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + disease_change))
                         
-                        # 🌟 提取最近 3 轮对话历史
                         history_text = ""
                         for msg in st.session_state.messages[-6:]:
                             role = "医生" if msg["role"] == "user" else "家属"
@@ -733,7 +739,6 @@ with col_center:
                         reply_text = None
                         try:
                             tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
-                            # 🌟 将历史对话注入 Prompt
                             ai_prompt = f"""
                             你是2岁急性喉炎患儿的妈妈，在急诊室跟医生对话。
                             当前情绪：{tone_prompt}。
