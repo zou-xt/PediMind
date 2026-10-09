@@ -10,7 +10,7 @@ os.environ["HTTPS_PROXY"] = ""
 os.environ["NO_PROXY"] = "*"
 
 # ⚠️ 请替换为你刚刚测试成功的智谱AI API Key
-API_KEY = "st.secrets["ZHIPU_API_KEY"]" 
+API_KEY = st.secrets["ZHIPU_API_KEY"]
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 
