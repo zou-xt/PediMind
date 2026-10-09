@@ -178,15 +178,16 @@ with col_left:
     st.progress(st.session_state.trust_score / 100)
     st.metric(label="⏳ 剩余行动点", value=f"{st.session_state.action_points} / 5")
     
-    st.divider()
+        st.divider()
     st.subheader("📈 实时生命体征")
     dp = st.session_state.disease_progress
-       if dp < 40:
+    
+    if dp < 40:
         c1, c2 = st.columns(2)
         c1.metric("SpO₂", "97%")
         c2.metric("心率(次/分)", "120")
         c1.metric("呼吸(次/分)", "28")
-        c2.metric("意识", "轻度烦躁") # 尝试保留，如果还是被截断就改成“轻度”
+        c2.metric("意识", "轻度烦躁")
     elif dp < 70:
         c1, c2 = st.columns(2)
         c1.metric("SpO₂", "93%")
