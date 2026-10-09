@@ -84,8 +84,9 @@ DIAGNOSIS_OPTIONS = {
     "D": {"label": "D. 支气管哮喘", "is_correct": False, "score": 0, "disease_change": 15, "reply": "❌ 误诊！患儿表现为吸气性呼吸困难（喉鸣），而非呼气性呼吸困难（哮鸣），且无过敏史。误诊导致病情进一步恶化！"}
 }
 
+# 🌟 更新：听诊反馈改为启发式引导
 AUSCULTATION_OPTIONS = {
-    "A": {"label": "A. 吸气性喉鸣（Stridor）", "is_correct": True, "feedback": "✅ 正确！你听到了典型的吸气性喉鸣，这提示上气道梗阻，结合犬吠样咳嗽，高度支持急性喉炎！"},
+    "A": {"label": "A. 吸气性喉鸣（Stridor）", "is_correct": True, "feedback": "✅ 正确！你听到了典型的吸气性喉鸣，这提示上气道梗阻。结合患儿‘犬吠样咳嗽’和‘夜间加重’的病史，你考虑最可能的诊断是什么？请继续收集线索，准备在第三幕给出你的初步诊断吧！"},
     "B": {"label": "B. 呼气性哮鸣音（Wheezing）", "is_correct": False, "feedback": "❌ 错误！你听到的是吸气性喉鸣，而不是呼气性哮鸣音。哮鸣音多见于哮喘或细支气管炎。"},
     "C": {"label": "C. 湿啰音（Crackles）", "is_correct": False, "feedback": "❌ 错误！湿啰音多见于肺炎或肺水肿，与本例上气道梗阻的听诊特征不符。"},
     "D": {"label": "D. 呼吸音正常", "is_correct": False, "feedback": "❌ 错误！患儿有明显的呼吸困难，听诊不可能完全正常。"}
@@ -281,7 +282,7 @@ with col_right:
         if "吸气性喉鸣" in st.session_state.unlocked_clues and os.path.exists("stridor.jpg"):
             st.image("stridor.jpg", caption="吸气性喉鸣听诊波形", width=300)
         if "三凹征" in st.session_state.unlocked_clues and os.path.exists("three_depressions.jpg"):
-            st.image("three_depressions.jpg", caption="三凹征：吸气时胸骨上窝、锁骨上窝、肋间隙凹陷", width=350)
+            st.image("three_depressions.jpg", caption="患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷", width=350)
     
     if st.session_state.penalty_log:
         st.divider()
@@ -305,7 +306,7 @@ with col_center:
             tab1, tab2, tab3, tab4 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊", "🥁 叩诊"])
             
             with tab1:
-                if st.button("观察呼吸系统（三凹征）", key="vis_resp"):
+                if st.button("观察呼吸系统", key="vis_resp"):
                     if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("vis_resp"):
                         st.session_state.action_points -= 1
                         st.session_state.physical_exam_done["vis_resp"] = True
