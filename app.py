@@ -411,7 +411,7 @@ with col_left:
                 if mode == "easy": st.warning("⚠️ 问诊结束。请给出初步诊断：")
                 else: st.warning("⚠️ 家长正焦急地看着你，请给出你的判断：")
                 for opt_key, opt in DIAGNOSIS_OPTIONS.items():
-                    if st.button(opt["label"], key=f"diag_{opt_key}", width="stretch"):
+                    if st.button(opt["label"], key=f"diag_{opt_key}", use_container_width=True):
                         st.session_state.diagnosis_processed = True
                         st.session_state.diagnosis_made = opt_key
                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + opt["disease_change"]))
@@ -425,7 +425,7 @@ with col_left:
                         st.session_state.messages.append({"role": "assistant", "content": opt["reply"]})
                         st.rerun()
             elif st.session_state.action_points <= 2 and (st.session_state.time_period == 1 or st.session_state.diagnosis_processed):
-                if st.button("▶️ 进入下一幕", width="stretch"):
+                if st.button("▶️ 进入下一幕", use_container_width=True):
                     advance_period(is_decision_phase=False)
                     st.rerun()
             elif st.session_state.action_points > 2:
@@ -433,14 +433,14 @@ with col_left:
                 else: st.caption(f"⏳ 剩余问诊次数：{st.session_state.action_points}")
         
         if st.session_state.time_period in [2, 6] and st.session_state.decision_made.get(st.session_state.time_period):
-            if st.button("▶️ 继续剧情", width="stretch"):
+            if st.button("▶️ 继续剧情", use_container_width=True):
                 advance_period(is_decision_phase=True)
                 st.rerun()
         
         if st.session_state.time_period == 5 and not st.session_state.comm_made:
             st.warning("⚠️ 请选择你向家长交代病情的方式：")
             for opt_key, opt in COMMUNICATION_OPTIONS.items():
-                if st.button(opt["label"], key=f"comm_{opt_key}", width="stretch"):
+                if st.button(opt["label"], key=f"comm_{opt_key}", use_container_width=True):
                     st.session_state.comm_made = True
                     st.session_state.score_empathy += opt["score"]
                     st.session_state.trust_score = max(0, min(100, st.session_state.trust_score + opt["trust_change"]))
@@ -452,12 +452,12 @@ with col_left:
                     st.rerun()
         
         if st.session_state.time_period == 5 and st.session_state.comm_made:
-            if st.button("▶️ 进入下一幕", width="stretch"):
+            if st.button("▶️ 进入下一幕", use_container_width=True):
                 advance_period(is_decision_phase=True)
                 st.rerun()
         
         if st.session_state.time_period == 3 and st.session_state.diagnosis_processed and st.session_state.action_points <= 2:
-            if st.button("🚨 突发事件！进入第四幕", width="stretch"):
+            if st.button("🚨 突发事件！进入第四幕", use_container_width=True):
                 st.session_state.time_period = 4
                 st.session_state.action_points = 3 
                 st.session_state.disease_progress = max(70, st.session_state.disease_progress + 10)
@@ -465,7 +465,7 @@ with col_left:
                 st.rerun()
         
         if st.session_state.time_period == 4 and st.session_state.crisis_correct_count >= 2:
-            if st.button("✅ 进入第五幕", width="stretch"):
+            if st.button("✅ 进入第五幕", use_container_width=True):
                 st.session_state.score_emergency += min(25, st.session_state.crisis_correct_count * 10)
                 st.session_state.time_period = 5
                 st.session_state.action_points = 5 if mode == "easy" else 3
@@ -474,13 +474,13 @@ with col_left:
     
     st.divider()
     if not st.session_state.game_over and st.session_state.time_period >= 6:
-        if st.button("📝 提交诊断，结束游戏", width="stretch"):
+        if st.button("📝 提交诊断，结束游戏", use_container_width=True):
             st.session_state.game_over = True
             st.rerun()
     elif not st.session_state.game_over:
         st.caption("💡 后期才会开放提交诊断")
     
-    if st.button("🔄 重新开始游戏", width="stretch"):
+    if st.button("🔄 重新开始游戏", use_container_width=True):
         restart_game()
 
 # ------------------ 右侧：线索夹与体征图库 ------------------
@@ -591,7 +591,7 @@ with col_center:
             
         st.write("请判断你听到的是什么呼吸音：")
         for opt_key, opt in AUSCULTATION_OPTIONS.items():
-            if st.button(opt["label"], key=f"aus_{opt_key}", width="stretch"):
+            if st.button(opt["label"], key=f"aus_{opt_key}", use_container_width=True):
                 st.session_state.auscultation_mode = False
                 st.session_state.auscultation_completed = True
                 st.session_state.messages.append({"role": "user", "content": f"【听诊】{opt['label']}"})
@@ -621,7 +621,7 @@ with col_center:
                 if mode == "easy": st.warning(f"⚠️ {decision['prompt']}")
                 else: st.warning("⚠️ 请立刻做出你的临床决策：")
                 for opt_key, opt in decision["options"].items():
-                    if st.button(opt["label"], key=f"dec_{st.session_state.time_period}_{opt_key}", width="stretch"):
+                    if st.button(opt["label"], key=f"dec_{st.session_state.time_period}_{opt_key}", use_container_width=True):
                         st.session_state.decision_made[st.session_state.time_period] = opt_key
                         st.session_state.messages.append({"role": "user", "content": f"【决策】{opt['label']}"})
                         st.session_state.messages.append({"role": "assistant", "content": opt["reply"]})
@@ -636,7 +636,7 @@ with col_center:
             if st.session_state.action_points > 0:
                 for act_key, act in CRISIS_ACTIONS.items():
                     if act_key not in st.session_state.crisis_actions:
-                        if st.button(act["label"], key=f"crisis_{act_key}", width="stretch"):
+                        if st.button(act["label"], key=f"crisis_{act_key}", use_container_width=True):
                             st.session_state.action_points -= 1
                             st.session_state.crisis_actions.append(act_key)
                             st.session_state.messages.append({"role": "user", "content": act["label"]})
@@ -832,7 +832,7 @@ if st.session_state.game_over:
         height=400,
         margin=dict(l=40, r=40, t=20, b=20)
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     st.subheader("🌳 动态诊断树复盘")
