@@ -181,24 +181,32 @@ with col_left:
     st.divider()
     st.subheader("📈 实时生命体征")
     dp = st.session_state.disease_progress
-    if dp < 40:
+       if dp < 40:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "97%"); c2.metric("心率", "120次/分")
-        c1.metric("呼吸", "28次/分"); c2.metric("意识", "轻度烦躁")
+        c1.metric("SpO₂", "97%")
+        c2.metric("心率(次/分)", "120")
+        c1.metric("呼吸(次/分)", "28")
+        c2.metric("意识", "轻度烦躁") # 尝试保留，如果还是被截断就改成“轻度”
     elif dp < 70:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "93%"); c2.metric("心率", "140次/分")
-        c1.metric("呼吸", "35次/分"); c2.metric("意识", "明显烦躁")
+        c1.metric("SpO₂", "93%")
+        c2.metric("心率(次/分)", "140")
+        c1.metric("呼吸(次/分)", "35")
+        c2.metric("意识", "明显烦躁")
         st.warning("⚠️ 出现三凹征，需立即干预")
     elif dp < 90:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "88%"); c2.metric("心率", "160次/分")
-        c1.metric("呼吸", "45次/分"); c2.metric("意识", "发绀、极度烦躁")
+        c1.metric("SpO₂", "88%")
+        c2.metric("心率(次/分)", "160")
+        c1.metric("呼吸(次/分)", "45")
+        c2.metric("意识", "发绀、烦躁")
         st.error("🚨 喉梗阻加重，随时可能呼吸衰竭")
     else:
         c1, c2 = st.columns(2)
-        c1.metric("SpO₂", "82%"); c2.metric("心率", "180次/分")
-        c1.metric("呼吸", "55次/分"); c2.metric("意识", "意识模糊、濒死感")
+        c1.metric("SpO₂", "82%")
+        c2.metric("心率(次/分)", "180")
+        c1.metric("呼吸(次/分)", "55")
+        c2.metric("意识", "意识模糊")
         st.error("💀 极度危险！随时可能心跳骤停")
     
     st.divider()
