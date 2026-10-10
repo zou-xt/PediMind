@@ -23,7 +23,6 @@ except Exception:
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
-ASR_MODEL = "glm-asr"  # 智谱语音识别模型
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # ================= 2. 页面初始化与主题切换 =================
@@ -298,22 +297,6 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，喉鸣音加重！情况紧急！"})
 
-def speech_to_text(audio_file):
-    """调用智谱AI的语音识别接口，支持文件上传方式"""
-    try:
-        with open("temp_audio.wav", "wb") as f:
-            f.write(audio_file.read())
-        with open("temp_audio.wav", "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model=ASR_MODEL,
-                file=f
-            )
-        os.remove("temp_audio.wav")
-        return transcript.text
-    except Exception as e:
-        st.toast(f"⚠️ 语音识别失败：{e}", icon="⚠️")
-        return None
-
 # ================= 7. 界面布局 =================
 st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;"><div class="status-badge status-trust"><div class="status-label">❤️ 家长信任值</div><div class="status-value">{st.session_state.trust_score} / 100</div></div><div class="status-badge status-action"><div class="status-label">⏳ 剩余行动点</div><div class="status-value">{st.session_state.action_points} / {5 if mode == "easy" else 3}</div></div><div class="status-badge status-disease"><div class="status-label">⚠️ 病情进展度</div><div class="status-value">{st.session_state.disease_progress} / 100</div></div></div>', unsafe_allow_html=True)
 
@@ -531,23 +514,8 @@ if st.session_state.view_mode == "desktop":
                     if mode == "easy": st.info("👉 请根据现有线索，做出初步诊断。")
                     else: st.info("👉 时间紧迫，请根据你的专业判断给出诊断。")
                 else:
-                    # 🌟 替换为文件上传方式的语音输入
-                    st.markdown("---")
-                    st.caption("🎙️ **语音输入（支持上传录音文件）**：")
-                    uploaded_audio = st.file_uploader("上传一段录音（mp3/wav/m4a）", type=["mp3", "wav", "m4a"], key="voice_upload")
-                    
-                    prompt = None
-                    if uploaded_audio is not None:
-                        with st.spinner("🎙️ 正在识别语音..."):
-                            prompt = speech_to_text(uploaded_audio)
-                        if prompt:
-                            st.success(f"✅ 识别成功：{prompt}")
-                    
-                    # 文字输入区
-                    text_prompt = st.chat_input("或输入你的问诊、查体或检查操作...")
-                    if text_prompt:
-                        prompt = text_prompt
-                    
+                    # 纯文字输入区
+                    prompt = st.chat_input("请输入你的问诊、查体或检查操作...")
                     if prompt:
                         if st.session_state.action_points <= 0: st.warning("行动点已用完！请点击左侧『进入下一幕』。")
                         else:
@@ -639,17 +607,8 @@ else:
         with st.container(height=400):
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
-        # 🌟 手机端文件上传语音
-        st.markdown("---")
-        st.caption("🎙️ 语音输入（上传录音）：")
-        uploaded_audio = st.file_uploader("上传录音文件", type=["mp3", "wav", "m4a"], key="m_voice_upload")
-        prompt = None
-        if uploaded_audio is not None:
-            with st.spinner("识别中..."):
-                prompt = speech_to_text(uploaded_audio)
-            if prompt: st.success(f"✅ {prompt}")
-        text_prompt = st.chat_input("或输入问诊、查体或检查操作...")
-        if text_prompt: prompt = text_prompt
+        # 纯文字输入区
+        prompt = st.chat_input("请输入问诊、查体或检查操作...")
         if prompt and st.session_state.action_points > 0:
             st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
 
