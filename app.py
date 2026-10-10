@@ -45,7 +45,6 @@ if st.session_state.theme == "night":
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
         
-        /* 核心修复：夜间模式下的聊天输入框 */
         div[data-testid="stChatInput"] { background-color: #1a2a42 !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
         div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #ffffff !important; caret-color: #00b4d8 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
@@ -57,11 +56,21 @@ if st.session_state.theme == "night":
         div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
         div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
         
-        /* 核心修复：夜间模式下的代码块（诊断树） */
-        div[data-testid="stCodeBlock"] { background-color: rgba(0, 0, 0, 0.3) !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
-        div[data-testid="stCodeBlock"] pre { background-color: transparent !important; color: #e2e8f0 !important; }
-        div[data-testid="stCodeBlock"] code { color: #e2e8f0 !important; }
-        .stCodeBlock { background-color: transparent !important; }
+        /* 🌟 核心修复：诊断树代码块背景变深 */
+        div[data-testid="stCodeBlock"] {
+            background-color: rgba(13, 27, 42, 0.8) !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(0, 180, 216, 0.3) !important;
+        }
+        div[data-testid="stCodeBlock"] pre {
+            background-color: transparent !important;
+        }
+        div[data-testid="stCodeBlock"] code {
+            color: #e2e8f0 !important;
+        }
+        div[data-testid="stCodeBlock"] span {
+            color: #e2e8f0 !important;
+        }
         
         .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; padding: 12px 20px !important; }
         .stButton>button:hover { background: linear-gradient(135deg, rgba(0, 180, 216, 0.3), rgba(0, 180, 216, 0.1)) !important; border: 1px solid rgba(0, 180, 216, 0.7) !important; }
@@ -121,8 +130,6 @@ else:
         .feature-list li { font-size: 14px; color: #4a5568 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
         .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #48bb78 !important; font-weight: bold; }
         .hard-card .feature-list li:before { content: "⚡"; color: #e53e3e !important; }
-        code { background-color: #edf2f7 !important; color: #0077b6 !important; }
-        pre { background-color: #edf2f7 !important; border: 1px solid #e2e8f0 !important; border-radius: 10px !important; }
     </style>
     """
 st.markdown(theme_css, unsafe_allow_html=True)
@@ -656,12 +663,12 @@ if st.session_state.game_over:
     s_empathy_final = min(15, st.session_state.score_empathy + (st.session_state.trust_score * 0.1))
     scores = [st.session_state.score_inquiry, st.session_state.score_diagnosis, st.session_state.score_emergency, s_empathy_final]
     if st.session_state.theme == "night":
-        chart_text_color = "#e2e8f0"; chart_grid_color = "rgba(255, 255, 255, 0.15)"; chart_bg = "rgba(0,0,0,0)"
+        chart_text_color = "#ffffff"; chart_grid_color = "rgba(0, 180, 216, 0.2)"; chart_bg = "rgba(0,0,0,0)"
     else:
         chart_text_color = "#1a202c"; chart_grid_color = "rgba(0, 0, 0, 0.1)"; chart_bg = "rgba(255, 255, 255, 0.8)"
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(r=[(s / m) * 100 for s, m in zip(scores, [30, 30, 25, 15])], theta=['问诊完整性', '鉴别诊断', '紧急处理', '医患沟通'], fill='toself', line_color='#00b4d8' if st.session_state.theme == "night" else '#0077b6', fillcolor='rgba(0, 180, 216, 0.2)' if st.session_state.theme == "night" else 'rgba(0, 119, 182, 0.2)'))
-    fig.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=chart_grid_color, tickfont=dict(color=chart_text_color)), angularaxis=dict(tickfont=dict(color=chart_text_color), gridcolor=chart_grid_color)), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
+    fig.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=chart_grid_color, tickfont=dict(color=chart_text_color, size=12)), angularaxis=dict(tickfont=dict(color=chart_text_color, size=14, weight="bold"), gridcolor=chart_grid_color)), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
     st.plotly_chart(fig, use_container_width=True)
     
     st.divider(); st.subheader("🌳 动态诊断树复盘")
