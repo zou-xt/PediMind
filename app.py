@@ -67,7 +67,7 @@ CASES = {
 }
 
 # ================= 3. 页面初始化与状态 =================
-st.set_page_config(page_title="PediMind · 急症风云", page_icon="🏥", layout="wide")
+st.set_page_config(page_title="PediMind · 急诊风云", page_icon="🏥", layout="wide")
 
 if "theme" not in st.session_state:
     st.session_state.theme = "night"
