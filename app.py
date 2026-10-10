@@ -7,6 +7,7 @@ import json
 import pandas as pd
 from openai import OpenAI
 import plotly.graph_objects as go
+import plotly.express as px  # 🌟 核心修复：补充导入 plotly.express
 from collections import Counter
 
 # ================= 1. 配置区 =================
@@ -45,7 +46,6 @@ if st.session_state.theme == "night":
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
         
-        /* 🌟 核心修复：夜间模式下的聊天输入框（白底深灰字） */
         div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
         div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #4a5568 !important; caret-color: #4a5568 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
@@ -57,7 +57,6 @@ if st.session_state.theme == "night":
         div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
         div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
         
-        /* 核心修复：诊断树代码块背景变深 */
         div[data-testid="stCodeBlock"] { background-color: rgba(13, 27, 42, 0.8) !important; border-radius: 10px !important; border: 1px solid rgba(0, 180, 216, 0.3) !important; }
         div[data-testid="stCodeBlock"] pre { background-color: transparent !important; }
         div[data-testid="stCodeBlock"] code { color: #e2e8f0 !important; }
@@ -163,6 +162,7 @@ if st.sidebar.button("🎮 返回游戏"): st.session_state.page = "game"
 if "page" not in st.session_state: st.session_state.page = "game"
 RECORDS_FILE = "game_records.json"
 
+# 🌟 教师仪表盘（已用 px 美化）
 if st.session_state.page == "teacher":
     st.title("📊 儿科急诊模拟器 · 教师仪表盘")
     st.markdown("该面板展示班级同学在游戏中的整体表现，用于教学效果评估。")
@@ -175,79 +175,46 @@ if st.session_state.page == "teacher":
     avg_score = sum(r['score'] for r in records) / total_plays
     max_score = max(r['score'] for r in records)
     
-    # 顶部核心指标卡
     c1, c2, c3 = st.columns(3)
     c1.metric("总测试人次", total_plays)
     c2.metric("班级平均分", f"{avg_score:.1f} / 100")
     c3.metric("最高分", f"{max_score} / 100")
-    
     st.divider()
     
-    # 🌟 根据主题设置图表字体颜色和背景
     if st.session_state.theme == "night":
         chart_text_color = "#e2e8f0"; chart_bg = "rgba(0,0,0,0)"
     else:
         chart_text_color = "#1a202c"; chart_bg = "rgba(255,255,255,0.8)"
 
-    # 1. 结局分布图
     st.subheader("🎬 结局分布")
     title_counts = Counter(r["title"] for r in records)
     title_df = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"]).sort_values("人数", ascending=False)
-    
-    fig1 = px.bar(title_df, x="结局称号", y="人数", text="人数", 
-                  color="结局称号",
-                  color_discrete_sequence=["#00b4d8", "#f4a261", "#e63946", "#2a9d8f"])
+    fig1 = px.bar(title_df, x="结局称号", y="人数", text="人数", color="结局称号", color_discrete_sequence=["#00b4d8", "#f4a261", "#e63946", "#2a9d8f"])
     fig1.update_traces(textposition='outside', textfont_size=14)
-    fig1.update_layout(
-        paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color),
-        xaxis=dict(title="", tickfont=dict(size=12)), yaxis=dict(title="人数", tickfont=dict(size=12)),
-        showlegend=False, height=300, margin=dict(l=20, r=20, t=20, b=20)
-    )
+    fig1.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), xaxis=dict(title="", tickfont=dict(size=12)), yaxis=dict(title="人数", tickfont=dict(size=12)), showlegend=False, height=300, margin=dict(l=20, r=20, t=20, b=20))
     st.plotly_chart(fig1, use_container_width=True)
 
-    # 2. 误诊方向分布图
     st.subheader("❌ 误诊方向分布（第三幕诊断）")
     diagnosis_map = {"A": "急性喉炎（正确）", "B": "急性会厌炎", "C": "气道异物", "D": "支气管哮喘"}
     diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
     diag_df = pd.DataFrame([(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()], columns=["诊断选择", "人数"]).sort_values("人数", ascending=False)
-    
-    # 将长标签截断，避免排版混乱（例如：“急性喉炎（正确）” -> “急性喉炎”）
     diag_df["诊断选择"] = diag_df["诊断选择"].apply(lambda x: x[:8] + "..." if len(x) > 8 else x)
-
-    fig2 = px.bar(diag_df, x="诊断选择", y="人数", text="人数",
-                  color="诊断选择",
-                  color_discrete_sequence=["#e63946", "#f4a261", "#2a9d8f", "#00b4d8"])
+    fig2 = px.bar(diag_df, x="诊断选择", y="人数", text="人数", color="诊断选择", color_discrete_sequence=["#e63946", "#f4a261", "#2a9d8f", "#00b4d8"])
     fig2.update_traces(textposition='outside', textfont_size=14)
-    fig2.update_layout(
-        paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color),
-        xaxis=dict(title="", tickfont=dict(size=13)), yaxis=dict(title="人数", tickfont=dict(size=12)),
-        showlegend=False, height=300, margin=dict(l=20, r=20, t=20, b=20)
-    )
+    fig2.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), xaxis=dict(title="", tickfont=dict(size=13)), yaxis=dict(title="人数", tickfont=dict(size=12)), showlegend=False, height=300, margin=dict(l=20, r=20, t=20, b=20))
     st.plotly_chart(fig2, use_container_width=True)
 
-    # 3. 最常见操作失误 Top 5
     st.subheader("⚠️ 最常见操作失误 Top 5")
     all_penalties = [p for r in records for p in r.get("penalties", [])]
     if all_penalties:
         penalty_counts = Counter(all_penalties)
         penalty_df = pd.DataFrame(penalty_counts.most_common(5), columns=["失误操作", "频次"])
-        
-        # 简化失误操作的标签文本
         penalty_df["失误操作"] = penalty_df["失误操作"].apply(lambda x: x[:15] + "..." if len(x) > 15 else x)
-        
-        fig3 = px.bar(penalty_df, x="失误操作", y="频次", text="频次",
-                      color="失误操作",
-                      color_discrete_sequence=["#e63946", "#f4a261", "#e9c46a", "#2a9d8f", "#00b4d8"])
+        fig3 = px.bar(penalty_df, x="失误操作", y="频次", text="频次", color="失误操作", color_discrete_sequence=["#e63946", "#f4a261", "#e9c46a", "#2a9d8f", "#00b4d8"])
         fig3.update_traces(textposition='outside', textfont_size=14)
-        fig3.update_layout(
-            paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color),
-            xaxis=dict(title="", tickfont=dict(size=12)), yaxis=dict(title="频次", tickfont=dict(size=12)),
-            showlegend=False, height=350, margin=dict(l=20, r=20, t=20, b=20)
-        )
+        fig3.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), xaxis=dict(title="", tickfont=dict(size=12)), yaxis=dict(title="频次", tickfont=dict(size=12)), showlegend=False, height=350, margin=dict(l=20, r=20, t=20, b=20))
         st.plotly_chart(fig3, use_container_width=True)
-    else:
-        st.success("🎉 目前没有任何失误操作记录！")
-    
+    else: st.success("🎉 目前没有任何失误操作记录！")
     st.stop()
 
 defaults = {
