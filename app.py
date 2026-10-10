@@ -23,7 +23,6 @@ except Exception:
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
-ASR_MODEL = "glm-asr"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # ================= 2. 页面初始化与主题切换 =================
@@ -46,16 +45,11 @@ if st.session_state.theme == "night":
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
         
-        /* 🌟 核心修复：夜间模式下的聊天输入框与录音组件 */
+        /* 核心修复：夜间模式下的聊天输入框 */
         div[data-testid="stChatInput"] { background-color: #1a2a42 !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
         div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #ffffff !important; caret-color: #00b4d8 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
         div[data-testid="stChatInput"] button { background-color: #e63946 !important; color: #ffffff !important; border-radius: 8px !important; }
-        
-        div[data-testid="stAudioInput"] { background-color: #1a2a42 !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
-        div[data-testid="stAudioInput"] * { color: #ffffff !important; }
-        div[data-testid="stAudioInput"] button { background-color: transparent !important; color: #ffffff !important; }
-        div[data-testid="stAudioInput"] div { background-color: transparent !important; }
         
         div[data-testid="stAlert"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
         div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
@@ -63,7 +57,7 @@ if st.session_state.theme == "night":
         div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
         div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
         
-        /* 🌟 核心修复：夜间模式下的代码块（诊断树） */
+        /* 核心修复：夜间模式下的代码块（诊断树） */
         div[data-testid="stCodeBlock"] { background-color: rgba(0, 0, 0, 0.3) !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
         div[data-testid="stCodeBlock"] pre { background-color: transparent !important; color: #e2e8f0 !important; }
         div[data-testid="stCodeBlock"] code { color: #e2e8f0 !important; }
@@ -313,17 +307,6 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，喉鸣音加重！情况紧急！"})
 
-def speech_to_text(audio_file):
-    try:
-        with open("temp_audio.wav", "wb") as f: f.write(audio_file.read())
-        with open("temp_audio.wav", "rb") as f:
-            transcript = client.audio.transcriptions.create(model=ASR_MODEL, file=f)
-        os.remove("temp_audio.wav")
-        return transcript.text
-    except Exception as e:
-        st.toast(f"⚠️ 语音识别失败：{e}", icon="⚠️")
-        return None
-
 # ================= 7. 界面布局 =================
 st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;"><div class="status-badge status-trust"><div class="status-label">❤️ 家长信任值</div><div class="status-value">{st.session_state.trust_score} / 100</div></div><div class="status-badge status-action"><div class="status-label">⏳ 剩余行动点</div><div class="status-value">{st.session_state.action_points} / {5 if mode == "easy" else 3}</div></div><div class="status-badge status-disease"><div class="status-label">⚠️ 病情进展度</div><div class="status-value">{st.session_state.disease_progress} / 100</div></div></div>', unsafe_allow_html=True)
 
@@ -482,7 +465,7 @@ if st.session_state.view_mode == "desktop":
                         st.toast("❌ 听诊错误！病情加重 +10", icon="🚨")
                     st.rerun()
         else:
-            with st.container(height=380):
+            with st.container(height=450):
                 for msg in st.session_state.messages:
                     with st.chat_message(msg["role"]): st.write(msg["content"])
             if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "decision":
@@ -541,24 +524,7 @@ if st.session_state.view_mode == "desktop":
                     if mode == "easy": st.info("👉 请根据现有线索，做出初步诊断。")
                     else: st.info("👉 时间紧迫，请根据你的专业判断给出诊断。")
                 else:
-                    # 🌟 语音输入区
-                    st.markdown("---")
-                    st.caption("🎙️ **语音输入（点击下方麦克风录制）**：")
-                    audio_value = st.audio_input("🎙️ 点击录音", key="voice_input")
-                    
-                    prompt = None
-                    if audio_value is not None:
-                        with st.spinner("🎙️ 正在识别语音..."):
-                            prompt = speech_to_text(audio_value)
-                        if prompt:
-                            st.success(f"✅ 识别成功：{prompt}")
-                    
-                    # 文字输入区
-                    text_prompt = st.chat_input("或输入你的问诊、查体或检查操作...")
-                    if text_prompt:
-                        prompt = text_prompt
-                    
-                    if prompt:
+                    if prompt := st.chat_input("请输入你的问诊、查体或检查操作..."):
                         if st.session_state.action_points <= 0: st.warning("行动点已用完！请点击左侧『进入下一幕』。")
                         else:
                             st.session_state.action_points -= 1; st.session_state.last_action_time = time.time()
@@ -650,21 +616,13 @@ else:
                     if "吸气性喉鸣" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("吸气性喉鸣")
                 st.rerun()
     else:
-        with st.container(height=400):
+        with st.container(height=500):
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
-        st.markdown("---")
-        st.caption("🎙️ 语音输入：")
-        audio_value = st.audio_input("点击录音", key="m_voice_input")
-        prompt = None
-        if audio_value is not None:
-            with st.spinner("识别中..."):
-                prompt = speech_to_text(audio_value)
-            if prompt: st.success(f"✅ {prompt}")
-        text_prompt = st.chat_input("或输入问诊、查体或检查操作...")
-        if text_prompt: prompt = text_prompt
-        if prompt and st.session_state.action_points > 0:
-            st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
+        if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
+            if prompt := st.chat_input("请输入问诊、查体或检查操作..."):
+                if st.session_state.action_points > 0:
+                    st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
 
 # ================= 8. 游戏结算与复盘 =================
 if st.session_state.game_over:
