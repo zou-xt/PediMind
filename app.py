@@ -32,36 +32,48 @@ if "theme" not in st.session_state:
     st.session_state.theme = "night"
 
 if st.session_state.theme == "night":
-    # 🌙 夜晚模式：深空蓝 + 医疗青
     theme_css = """
     <style>
         .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
         p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
         li { color: #cbd5e0 !important; }
+        
         section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; border-right: 1px solid rgba(255, 255, 255, 0.1); }
         section[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
         section[data-testid="stSidebar"] .stButton>button { border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; }
+        
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
         
-        /* 🌟 核心修复：输入框白底深灰字 */
-        div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; }
-        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #333333 !important; caret-color: #0077b6 !important; }
+        /* 🌟 核心修复：夜间模式下的聊天输入框（白底深灰字） */
+        div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #4a5568 !important; caret-color: #4a5568 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
+        div[data-testid="stChatInput"] button { background-color: #e63946 !important; color: #ffffff !important; border-radius: 8px !important; }
         
         div[data-testid="stAlert"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
         div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
         div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
         div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
         div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
+        
+        /* 核心修复：诊断树代码块背景变深 */
+        div[data-testid="stCodeBlock"] { background-color: rgba(13, 27, 42, 0.8) !important; border-radius: 10px !important; border: 1px solid rgba(0, 180, 216, 0.3) !important; }
+        div[data-testid="stCodeBlock"] pre { background-color: transparent !important; }
+        div[data-testid="stCodeBlock"] code { color: #e2e8f0 !important; }
+        div[data-testid="stCodeBlock"] span { color: #e2e8f0 !important; }
+        
         .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; padding: 12px 20px !important; }
         .stButton>button:hover { background: linear-gradient(135deg, rgba(0, 180, 216, 0.3), rgba(0, 180, 216, 0.1)) !important; border: 1px solid rgba(0, 180, 216, 0.7) !important; }
+        
         .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
         .status-label { font-size: 12px; color: #a0aec0 !important; margin-bottom: 6px; }
         .status-value { font-size: 22px; font-weight: 800; }
         .status-trust .status-value { color: #00b4d8 !important; } .status-action .status-value { color: #f6e05e !important; } .status-disease .status-value { color: #e63946 !important; }
+        
         .vital-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #00b4d8; }
         .vital-label { font-size: 11px; color: #a0aec0 !important; } .vital-value { font-size: 17px; font-weight: 700; color: #ffffff !important; }
+        
         .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
         .easy-card { background: linear-gradient(145deg, rgba(72, 187, 120, 0.15), rgba(72, 187, 120, 0.05)); border: 1px solid rgba(72, 187, 120, 0.4); }
         .hard-card { background: linear-gradient(145deg, rgba(230, 57, 70, 0.15), rgba(230, 57, 70, 0.05)); border: 1px solid rgba(230, 57, 70, 0.4); }
@@ -72,28 +84,20 @@ if st.session_state.theme == "night":
         .feature-list li { font-size: 14px; color: #e2e8f0 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
         .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #68d391 !important; font-weight: bold; }
         .hard-card .feature-list li:before { content: "⚡"; color: #fc8181 !important; }
-        code { background-color: rgba(0, 0, 0, 0.4) !important; color: #00b4d8 !important; }
-        pre { background-color: rgba(0, 0, 0, 0.4) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 10px !important; }
     </style>
     """
 else:
-    # ☀️ 白天模式：医疗白 + 浅灰卡片
     theme_css = """
     <style>
         .stApp { background-color: #f0f4f8 !important; color: #1a202c !important; }
         p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #1a202c !important; }
-        li { color: #4a5568 !important; }
         section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
         section[data-testid="stSidebar"] * { color: #1a202c !important; }
-        section[data-testid="stSidebar"] .stButton>button { border: 1px solid #0077b6 !important; background: #f0f4f8 !important; color: #0077b6 !important; }
         div[data-testid="stChatMessage"] { background-color: #ffffff !important; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         div[data-testid="stChatMessage"] p { color: #1a202c !important; }
-        
-        /* 🌟 输入框白天模式样式 */
         div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; }
-        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #333333 !important; caret-color: #0077b6 !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #1a202c !important; caret-color: #0077b6 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #718096 !important; }
-        
         div[data-testid="stAlert"] { background-color: #ffffff !important; border-radius: 12px; border: 1px solid #e2e8f0; }
         div[data-testid="stAlert"] p { color: #1a202c !important; }
         div[data-testid="stExpander"] > details { background-color: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; }
@@ -117,8 +121,6 @@ else:
         .feature-list li { font-size: 14px; color: #4a5568 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
         .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #48bb78 !important; font-weight: bold; }
         .hard-card .feature-list li:before { content: "⚡"; color: #e53e3e !important; }
-        code { background-color: #edf2f7 !important; color: #0077b6 !important; }
-        pre { background-color: #edf2f7 !important; border: 1px solid #e2e8f0 !important; border-radius: 10px !important; }
     </style>
     """
 st.markdown(theme_css, unsafe_allow_html=True)
@@ -162,89 +164,21 @@ if "page" not in st.session_state: st.session_state.page = "game"
 RECORDS_FILE = "game_records.json"
 
 if st.session_state.page == "teacher":
-    # 🌟 仪表盘全局深色医疗风适配
-    st.markdown("""
-    <style>
-        .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
-        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
-        .metric-card {
-            background: rgba(255, 255, 255, 0.05); border-radius: 14px;
-            padding: 20px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        .metric-label { font-size: 14px; color: #a0aec0 !important; margin-bottom: 8px; }
-        .metric-value { font-size: 32px; font-weight: 800; color: #ffffff !important; }
-        .metric-value-blue { color: #00b4d8 !important; }
-        .metric-value-red { color: #e63946 !important; }
-        .metric-value-green { color: #68d391 !important; }
-    </style>
-    """, unsafe_allow_html=True)
-    
     st.title("📊 儿科急诊模拟器 · 教师仪表盘")
-    st.markdown("该面板展示班级同学在游戏中的整体表现，用于教学效果评估。")
-    
-    if not os.path.exists(RECORDS_FILE):
-        st.warning("暂无数据。请让同学们至少完成一局游戏。")
-        st.stop()
-        
-    with open(RECORDS_FILE, "r", encoding="utf-8") as f: 
-        records = json.load(f)
-        
-    if len(records) == 0:
-        st.warning("暂无数据。")
-        st.stop()
-        
-    total_plays = len(records)
-    avg_score = sum(r["score"] for r in records) / total_plays
-    max_score = max(r["score"] for r in records)
-    
-    # 🌟 自定义数据卡片
+    if not os.path.exists(RECORDS_FILE): st.warning("暂无数据。"); st.stop()
+    with open(RECORDS_FILE, "r", encoding="utf-8") as f: records = json.load(f)
+    if len(records) == 0: st.warning("暂无数据。"); st.stop()
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">总测试人次</div><div class="metric-value metric-value-blue">{total_plays}</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">班级平均分</div><div class="metric-value">{avg_score:.1f} / 100</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">最高分</div><div class="metric-value metric-value-green">{max_score} / 100</div></div>', unsafe_allow_html=True)
-    
+    c1.metric("总测试人次", len(records))
+    c2.metric("班级平均分", f"{sum(r['score'] for r in records) / len(records):.1f} / 100")
+    c3.metric("最高分", f"{max(r['score'] for r in records)} / 100")
     st.divider()
-    
-    # 🌟 替换为 Plotly 图表
-    import plotly.express as px
-    
-    # 1. 结局分布
-    st.subheader("🎬 结局分布")
-    title_counts = Counter(r["title"] for r in records)
-    df_title = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"])
-    fig1 = px.bar(df_title, x="结局称号", y="人数", text="人数", color="结局称号", 
-                  color_discrete_sequence=px.colors.qualitative.Pastel)
-    fig1.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
-    fig1.update_traces(textposition="outside")
-    st.plotly_chart(fig1, use_container_width=True)
-    
-    # 2. 误诊方向分布
-    st.subheader("❌ 误诊方向分布")
-    diagnosis_map = {"A": "急性喉炎（正确）", "B": "急性会厌炎（误诊）", "C": "气道异物（误诊）", "D": "支气管哮喘（误诊）"}
-    diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
-    df_diag = pd.DataFrame([(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()], columns=["诊断选择", "人数"])
-    fig2 = px.pie(df_diag, names="诊断选择", values="人数", hole=0.4, 
-                  color_discrete_sequence=px.colors.qualitative.Set3)
-    fig2.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
-    st.plotly_chart(fig2, use_container_width=True)
-    
-    # 3. 最常见操作失误 Top 5
+    st.subheader("🎬 结局分布"); st.bar_chart(pd.DataFrame(Counter(r["title"] for r in records).items(), columns=["结局称号", "人数"]).set_index("结局称号"))
+    st.subheader("❌ 误诊方向分布"); st.bar_chart(pd.DataFrame(Counter(r.get("diagnosis", "未选择") for r in records).items(), columns=["诊断选择", "人数"]).set_index("诊断选择"))
     st.subheader("⚠️ 最常见操作失误 Top 5")
     all_penalties = [p for r in records for p in r.get("penalties", [])]
-    if all_penalties:
-        penalty_counts = Counter(all_penalties)
-        df_penalty = pd.DataFrame(penalty_counts.most_common(5), columns=["失误操作", "频次"])
-        fig3 = px.bar(df_penalty, x="频次", y="失误操作", orientation="h", text="频次",
-                      color_discrete_sequence=["#e63946"])
-        fig3.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
-        fig3.update_traces(textposition="outside")
-        st.plotly_chart(fig3, use_container_width=True)
-    else:
-        st.success("🎉 目前没有任何失误操作记录！")
+    if all_penalties: st.bar_chart(pd.DataFrame(Counter(all_penalties).most_common(5), columns=["失误操作", "频次"]).set_index("失误操作"))
+    else: st.success("🎉 目前没有任何失误操作记录！")
     st.stop()
 
 defaults = {
@@ -529,7 +463,7 @@ if st.session_state.view_mode == "desktop":
                         st.toast("❌ 听诊错误！病情加重 +10", icon="🚨")
                     st.rerun()
         else:
-            with st.container(height=420):
+            with st.container(height=450):
                 for msg in st.session_state.messages:
                     with st.chat_message(msg["role"]): st.write(msg["content"])
             if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "decision":
@@ -588,9 +522,7 @@ if st.session_state.view_mode == "desktop":
                     if mode == "easy": st.info("👉 请根据现有线索，做出初步诊断。")
                     else: st.info("👉 时间紧迫，请根据你的专业判断给出诊断。")
                 else:
-                    # 纯文字输入区
-                    prompt = st.chat_input("请输入你的问诊、查体或检查操作...")
-                    if prompt:
+                    if prompt := st.chat_input("请输入你的问诊、查体或检查操作..."):
                         if st.session_state.action_points <= 0: st.warning("行动点已用完！请点击左侧『进入下一幕』。")
                         else:
                             st.session_state.action_points -= 1; st.session_state.last_action_time = time.time()
@@ -621,7 +553,11 @@ if st.session_state.view_mode == "desktop":
                             reply_text = None
                             try:
                                 tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
-                                ai_prompt = f"""你正在扮演一个【2岁急性喉炎患儿的妈妈】，你没有任何医学背景，只是一个极度焦虑、自责的普通母亲。你的女儿小雨，2岁3个月，前天白天流鼻涕，凌晨1点半突发咳嗽。【你的对话铁律】1.绝对禁止说出任何医学术语！不能说“犬吠样咳嗽”、“吸气性喉鸣”、“三凹征”、“急性喉炎”等。你只能用大白话描述，比如“咳起来像小狗叫”、“嗓子哑了”、“吸气的时候胸口凹进去一块”、“声音很吓人”。2.绝对禁止给出任何诊断结论！3.禁止自言自语，请直接回答医生的问题。4.只能用口语化表达，可以带哭腔、结巴、感叹词。5.每次回复控制在50字以内。【对话历史】{history_text}医生刚刚说："{prompt}"。请直接回答医生："""
+                                ai_prompt = f"""你正在扮演一个【2岁急性喉炎患儿的妈妈】，你没有任何医学背景，只是一个极度焦虑、自责的普通母亲。
+                                你的女儿小雨，2岁3个月，前天白天流鼻涕，凌晨1点半突发咳嗽。
+                                【你的对话铁律】1.绝对禁止说出任何医学术语！不能说“犬吠样咳嗽”、“吸气性喉鸣”、“三凹征”、“急性喉炎”等。你只能用大白话描述，比如“咳起来像小狗叫”、“嗓子哑了”、“吸气的时候胸口凹进去一块”、“声音很吓人”。2.绝对禁止给出任何诊断结论！3.禁止自言自语，请直接回答医生的问题。4.只能用口语化表达，可以带哭腔、结巴、感叹词。5.每次回复控制在50字以内。
+                                【对话历史】{history_text}
+                                医生刚刚说："{prompt}"。请直接回答医生："""
                                 ai_response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": ai_prompt}], temperature=0.4, timeout=3)
                                 reply_text = ai_response.choices[0].message.content.strip()
                             except Exception: reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
@@ -678,13 +614,13 @@ else:
                     if "吸气性喉鸣" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("吸气性喉鸣")
                 st.rerun()
     else:
-        with st.container(height=400):
+        with st.container(height=500):
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
-        # 纯文字输入区
-        prompt = st.chat_input("请输入问诊、查体或检查操作...")
-        if prompt and st.session_state.action_points > 0:
-            st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
+        if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
+            if prompt := st.chat_input("请输入问诊、查体或检查操作..."):
+                if st.session_state.action_points > 0:
+                    st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
 
 # ================= 8. 游戏结算与复盘 =================
 if st.session_state.game_over:
@@ -717,8 +653,13 @@ if st.session_state.game_over:
     st.divider(); st.subheader("📊 个人能力雷达图")
     s_empathy_final = min(15, st.session_state.score_empathy + (st.session_state.trust_score * 0.1))
     scores = [st.session_state.score_inquiry, st.session_state.score_diagnosis, st.session_state.score_emergency, s_empathy_final]
-    fig = go.Figure(); fig.add_trace(go.Scatterpolar(r=[(s / m) * 100 for s, m in zip(scores, [30, 30, 25, 15])], theta=['问诊完整性', '鉴别诊断', '紧急处理', '医患沟通'], fill='toself'))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
+    if st.session_state.theme == "night":
+        chart_text_color = "#ffffff"; chart_grid_color = "rgba(0, 180, 216, 0.2)"; chart_bg = "rgba(0,0,0,0)"
+    else:
+        chart_text_color = "#1a202c"; chart_grid_color = "rgba(0, 0, 0, 0.1)"; chart_bg = "rgba(255, 255, 255, 0.8)"
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(r=[(s / m) * 100 for s, m in zip(scores, [30, 30, 25, 15])], theta=['问诊完整性', '鉴别诊断', '紧急处理', '医患沟通'], fill='toself', line_color='#00b4d8' if st.session_state.theme == "night" else '#0077b6', fillcolor='rgba(0, 180, 216, 0.2)' if st.session_state.theme == "night" else 'rgba(0, 119, 182, 0.2)'))
+    fig.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=chart_grid_color, tickfont=dict(color=chart_text_color, size=12)), angularaxis=dict(tickfont=dict(color=chart_text_color, size=14, weight="bold"), gridcolor=chart_grid_color)), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
     st.plotly_chart(fig, use_container_width=True)
     
     st.divider(); st.subheader("🌳 动态诊断树复盘")
