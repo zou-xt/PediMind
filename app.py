@@ -162,7 +162,7 @@ if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" 
 # ========== 屏幕 1：开始界面 ==========
 if st.session_state.screen == "start":
     st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 100px; letter-spacing: 8px;">🏥 PediMind</div>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急症风云</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急诊风云</div>', unsafe_allow_html=True)
     
     # 🌟 修改点：将小字改为整个游戏的通用介绍
     st.markdown("""
@@ -172,7 +172,7 @@ if st.session_state.screen == "start":
         问诊、查体、鉴别诊断、紧急处理——<br>
         每一次决策，都是一次临床思维的实战演练。<br>
         <br>
-        做好准备，迎接属于你的“急症风云”了吗？
+        做好准备，迎接属于你的“急诊风云”了吗？
     </div>
     """, unsafe_allow_html=True)
     
