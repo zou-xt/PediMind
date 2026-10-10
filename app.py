@@ -162,21 +162,89 @@ if "page" not in st.session_state: st.session_state.page = "game"
 RECORDS_FILE = "game_records.json"
 
 if st.session_state.page == "teacher":
+    # 🌟 仪表盘全局深色医疗风适配
+    st.markdown("""
+    <style>
+        .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
+        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05); border-radius: 14px;
+            padding: 20px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .metric-label { font-size: 14px; color: #a0aec0 !important; margin-bottom: 8px; }
+        .metric-value { font-size: 32px; font-weight: 800; color: #ffffff !important; }
+        .metric-value-blue { color: #00b4d8 !important; }
+        .metric-value-red { color: #e63946 !important; }
+        .metric-value-green { color: #68d391 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.title("📊 儿科急诊模拟器 · 教师仪表盘")
-    if not os.path.exists(RECORDS_FILE): st.warning("暂无数据。"); st.stop()
-    with open(RECORDS_FILE, "r", encoding="utf-8") as f: records = json.load(f)
-    if len(records) == 0: st.warning("暂无数据。"); st.stop()
+    st.markdown("该面板展示班级同学在游戏中的整体表现，用于教学效果评估。")
+    
+    if not os.path.exists(RECORDS_FILE):
+        st.warning("暂无数据。请让同学们至少完成一局游戏。")
+        st.stop()
+        
+    with open(RECORDS_FILE, "r", encoding="utf-8") as f: 
+        records = json.load(f)
+        
+    if len(records) == 0:
+        st.warning("暂无数据。")
+        st.stop()
+        
+    total_plays = len(records)
+    avg_score = sum(r["score"] for r in records) / total_plays
+    max_score = max(r["score"] for r in records)
+    
+    # 🌟 自定义数据卡片
     c1, c2, c3 = st.columns(3)
-    c1.metric("总测试人次", len(records))
-    c2.metric("班级平均分", f"{sum(r['score'] for r in records) / len(records):.1f} / 100")
-    c3.metric("最高分", f"{max(r['score'] for r in records)} / 100")
+    with c1:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">总测试人次</div><div class="metric-value metric-value-blue">{total_plays}</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">班级平均分</div><div class="metric-value">{avg_score:.1f} / 100</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">最高分</div><div class="metric-value metric-value-green">{max_score} / 100</div></div>', unsafe_allow_html=True)
+    
     st.divider()
-    st.subheader("🎬 结局分布"); st.bar_chart(pd.DataFrame(Counter(r["title"] for r in records).items(), columns=["结局称号", "人数"]).set_index("结局称号"))
-    st.subheader("❌ 误诊方向分布"); st.bar_chart(pd.DataFrame(Counter(r.get("diagnosis", "未选择") for r in records).items(), columns=["诊断选择", "人数"]).set_index("诊断选择"))
+    
+    # 🌟 替换为 Plotly 图表
+    import plotly.express as px
+    
+    # 1. 结局分布
+    st.subheader("🎬 结局分布")
+    title_counts = Counter(r["title"] for r in records)
+    df_title = pd.DataFrame(title_counts.items(), columns=["结局称号", "人数"])
+    fig1 = px.bar(df_title, x="结局称号", y="人数", text="人数", color="结局称号", 
+                  color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig1.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
+    fig1.update_traces(textposition="outside")
+    st.plotly_chart(fig1, use_container_width=True)
+    
+    # 2. 误诊方向分布
+    st.subheader("❌ 误诊方向分布")
+    diagnosis_map = {"A": "急性喉炎（正确）", "B": "急性会厌炎（误诊）", "C": "气道异物（误诊）", "D": "支气管哮喘（误诊）"}
+    diag_counts = Counter(r.get("diagnosis", "未选择") for r in records)
+    df_diag = pd.DataFrame([(diagnosis_map.get(k, k), v) for k, v in diag_counts.items()], columns=["诊断选择", "人数"])
+    fig2 = px.pie(df_diag, names="诊断选择", values="人数", hole=0.4, 
+                  color_discrete_sequence=px.colors.qualitative.Set3)
+    fig2.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
+    st.plotly_chart(fig2, use_container_width=True)
+    
+    # 3. 最常见操作失误 Top 5
     st.subheader("⚠️ 最常见操作失误 Top 5")
     all_penalties = [p for r in records for p in r.get("penalties", [])]
-    if all_penalties: st.bar_chart(pd.DataFrame(Counter(all_penalties).most_common(5), columns=["失误操作", "频次"]).set_index("失误操作"))
-    else: st.success("🎉 目前没有任何失误操作记录！")
+    if all_penalties:
+        penalty_counts = Counter(all_penalties)
+        df_penalty = pd.DataFrame(penalty_counts.most_common(5), columns=["失误操作", "频次"])
+        fig3 = px.bar(df_penalty, x="频次", y="失误操作", orientation="h", text="频次",
+                      color_discrete_sequence=["#e63946"])
+        fig3.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
+        fig3.update_traces(textposition="outside")
+        st.plotly_chart(fig3, use_container_width=True)
+    else:
+        st.success("🎉 目前没有任何失误操作记录！")
     st.stop()
 
 defaults = {
