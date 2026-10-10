@@ -23,7 +23,7 @@ except Exception:
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
-ASR_MODEL = "glm-asr"  # 🌟 智谱语音识别模型
+ASR_MODEL = "glm-asr"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # ================= 2. 页面初始化与主题切换 =================
@@ -37,26 +37,49 @@ if st.session_state.theme == "night":
     <style>
         .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
         p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
+        li { color: #cbd5e0 !important; }
+        
         section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; border-right: 1px solid rgba(255, 255, 255, 0.1); }
         section[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+        section[data-testid="stSidebar"] .stButton>button { border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; }
+        
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
-        div[data-testid="stChatInput"] { background-color: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
+        
+        /* 🌟 核心修复：夜间模式下的聊天输入框与录音组件 */
+        div[data-testid="stChatInput"] { background-color: #1a2a42 !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
         div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #ffffff !important; caret-color: #00b4d8 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
+        div[data-testid="stChatInput"] button { background-color: #e63946 !important; color: #ffffff !important; border-radius: 8px !important; }
+        
+        div[data-testid="stAudioInput"] { background-color: #1a2a42 !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
+        div[data-testid="stAudioInput"] * { color: #ffffff !important; }
+        div[data-testid="stAudioInput"] button { background-color: transparent !important; color: #ffffff !important; }
+        div[data-testid="stAudioInput"] div { background-color: transparent !important; }
+        
         div[data-testid="stAlert"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
         div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
         div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
         div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
         div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
+        
+        /* 🌟 核心修复：夜间模式下的代码块（诊断树） */
+        div[data-testid="stCodeBlock"] { background-color: rgba(0, 0, 0, 0.3) !important; border-radius: 10px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
+        div[data-testid="stCodeBlock"] pre { background-color: transparent !important; color: #e2e8f0 !important; }
+        div[data-testid="stCodeBlock"] code { color: #e2e8f0 !important; }
+        .stCodeBlock { background-color: transparent !important; }
+        
         .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; padding: 12px 20px !important; }
         .stButton>button:hover { background: linear-gradient(135deg, rgba(0, 180, 216, 0.3), rgba(0, 180, 216, 0.1)) !important; border: 1px solid rgba(0, 180, 216, 0.7) !important; }
+        
         .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
         .status-label { font-size: 12px; color: #a0aec0 !important; margin-bottom: 6px; }
         .status-value { font-size: 22px; font-weight: 800; }
         .status-trust .status-value { color: #00b4d8 !important; } .status-action .status-value { color: #f6e05e !important; } .status-disease .status-value { color: #e63946 !important; }
+        
         .vital-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #00b4d8; }
         .vital-label { font-size: 11px; color: #a0aec0 !important; } .vital-value { font-size: 17px; font-weight: 700; color: #ffffff !important; }
+        
         .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
         .easy-card { background: linear-gradient(145deg, rgba(72, 187, 120, 0.15), rgba(72, 187, 120, 0.05)); border: 1px solid rgba(72, 187, 120, 0.4); }
         .hard-card { background: linear-gradient(145deg, rgba(230, 57, 70, 0.15), rgba(230, 57, 70, 0.05)); border: 1px solid rgba(230, 57, 70, 0.4); }
@@ -67,8 +90,6 @@ if st.session_state.theme == "night":
         .feature-list li { font-size: 14px; color: #e2e8f0 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
         .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #68d391 !important; font-weight: bold; }
         .hard-card .feature-list li:before { content: "⚡"; color: #fc8181 !important; }
-        code { background-color: rgba(0, 0, 0, 0.4) !important; color: #00b4d8 !important; }
-        pre { background-color: rgba(0, 0, 0, 0.4) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 10px !important; }
     </style>
     """
 else:
@@ -292,17 +313,11 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，喉鸣音加重！情况紧急！"})
 
-# 🌟 语音转文字函数
 def speech_to_text(audio_file):
-    """调用智谱AI的语音识别接口"""
     try:
-        with open("temp_audio.wav", "wb") as f:
-            f.write(audio_file.read())
+        with open("temp_audio.wav", "wb") as f: f.write(audio_file.read())
         with open("temp_audio.wav", "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model=ASR_MODEL,
-                file=f
-            )
+            transcript = client.audio.transcriptions.create(model=ASR_MODEL, file=f)
         os.remove("temp_audio.wav")
         return transcript.text
     except Exception as e:
@@ -467,7 +482,7 @@ if st.session_state.view_mode == "desktop":
                         st.toast("❌ 听诊错误！病情加重 +10", icon="🚨")
                     st.rerun()
         else:
-            with st.container(height=420):
+            with st.container(height=380):
                 for msg in st.session_state.messages:
                     with st.chat_message(msg["role"]): st.write(msg["content"])
             if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "decision":
@@ -638,7 +653,6 @@ else:
         with st.container(height=400):
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
-        # 🌟 手机端语音输入
         st.markdown("---")
         st.caption("🎙️ 语音输入：")
         audio_value = st.audio_input("点击录音", key="m_voice_input")
@@ -683,8 +697,13 @@ if st.session_state.game_over:
     st.divider(); st.subheader("📊 个人能力雷达图")
     s_empathy_final = min(15, st.session_state.score_empathy + (st.session_state.trust_score * 0.1))
     scores = [st.session_state.score_inquiry, st.session_state.score_diagnosis, st.session_state.score_emergency, s_empathy_final]
-    fig = go.Figure(); fig.add_trace(go.Scatterpolar(r=[(s / m) * 100 for s, m in zip(scores, [30, 30, 25, 15])], theta=['问诊完整性', '鉴别诊断', '紧急处理', '医患沟通'], fill='toself'))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
+    if st.session_state.theme == "night":
+        chart_text_color = "#e2e8f0"; chart_grid_color = "rgba(255, 255, 255, 0.15)"; chart_bg = "rgba(0,0,0,0)"
+    else:
+        chart_text_color = "#1a202c"; chart_grid_color = "rgba(0, 0, 0, 0.1)"; chart_bg = "rgba(255, 255, 255, 0.8)"
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(r=[(s / m) * 100 for s, m in zip(scores, [30, 30, 25, 15])], theta=['问诊完整性', '鉴别诊断', '紧急处理', '医患沟通'], fill='toself', line_color='#00b4d8' if st.session_state.theme == "night" else '#0077b6', fillcolor='rgba(0, 180, 216, 0.2)' if st.session_state.theme == "night" else 'rgba(0, 119, 182, 0.2)'))
+    fig.update_layout(paper_bgcolor=chart_bg, plot_bgcolor=chart_bg, font=dict(color=chart_text_color), polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=chart_grid_color, tickfont=dict(color=chart_text_color)), angularaxis=dict(tickfont=dict(color=chart_text_color), gridcolor=chart_grid_color)), showlegend=False, height=400, margin=dict(l=40, r=40, t=20, b=20))
     st.plotly_chart(fig, use_container_width=True)
     
     st.divider(); st.subheader("🌳 动态诊断树复盘")
