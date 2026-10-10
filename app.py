@@ -67,7 +67,7 @@ CASES = {
 }
 
 # ================= 3. 页面初始化与状态 =================
-st.set_page_config(page_title="急诊室疑云", page_icon="🏥", layout="wide")
+st.set_page_config(page_title="PediMind · 急症风云", page_icon="🏥", layout="wide")
 
 if "theme" not in st.session_state:
     st.session_state.theme = "night"
@@ -161,8 +161,8 @@ if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" 
 
 # ========== 屏幕 1：开始界面 ==========
 if st.session_state.screen == "start":
-    st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 100px; letter-spacing: 8px;">🏥 急诊室疑云</div>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align: center; font-size: 24px; color: #a0aec0; margin-bottom: 30px; letter-spacing: 3px;">一场关于生命与时间的临床模拟</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 100px; letter-spacing: 8px;">🏥 PediMind</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急症风云</div>', unsafe_allow_html=True)
     
     st.markdown("""
     <div style="text-align: center; max-width: 700px; margin: 0 auto 60px auto; line-height: 2; font-size: 16px; color: #cbd5e0;">
