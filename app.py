@@ -43,9 +43,12 @@ if st.session_state.theme == "night":
         section[data-testid="stSidebar"] .stButton>button { border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; }
         div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
         div[data-testid="stChatMessage"] p { color: #ffffff !important; }
-        div[data-testid="stChatInput"] { background-color: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
-        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #ffffff !important; caret-color: #00b4d8 !important; }
+        
+        /* 🌟 核心修复：输入框白底深灰字 */
+        div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #333333 !important; caret-color: #0077b6 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
+        
         div[data-testid="stAlert"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
         div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
         div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
@@ -85,9 +88,12 @@ else:
         section[data-testid="stSidebar"] .stButton>button { border: 1px solid #0077b6 !important; background: #f0f4f8 !important; color: #0077b6 !important; }
         div[data-testid="stChatMessage"] { background-color: #ffffff !important; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         div[data-testid="stChatMessage"] p { color: #1a202c !important; }
+        
+        /* 🌟 输入框白天模式样式 */
         div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; }
-        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #1a202c !important; caret-color: #0077b6 !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #333333 !important; caret-color: #0077b6 !important; }
         div[data-testid="stChatInput"] textarea::placeholder { color: #718096 !important; }
+        
         div[data-testid="stAlert"] { background-color: #ffffff !important; border-radius: 12px; border: 1px solid #e2e8f0; }
         div[data-testid="stAlert"] p { color: #1a202c !important; }
         div[data-testid="stExpander"] > details { background-color: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; }
