@@ -23,103 +23,105 @@ except Exception:
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
+ASR_MODEL = "glm-asr"  # 🌟 智谱语音识别模型
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 页面初始化与深色医疗风UI（全修复版） =================
+# ================= 2. 页面初始化与主题切换 =================
 st.set_page_config(page_title="急诊室疑云：2岁患儿的犬吠声", page_icon="🏥", layout="wide")
 
-st.markdown("""
-<style>
-    /* 🌟 全局背景与文本强制高对比度 */
-    .stApp { background: linear-gradient(135deg, #0f1c2e 0%, #1a2a42 50%, #0f1c2e 100%); color: #e2e8f0 !important; }
-    p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
-    li { color: #cbd5e0 !important; }
-    
-    /* 🌟 核心修复：侧边栏深色背景 */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f1c2e 0%, #1a2a42 100%) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    section[data-testid="stSidebar"] * {
-        color: #e2e8f0 !important;
-    }
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: #ffffff !important;
-    }
-    section[data-testid="stSidebar"] .stButton>button {
-        border: 1px solid rgba(99, 179, 237, 0.4) !important;
-        background: linear-gradient(135deg, rgba(99, 179, 237, 0.15), rgba(99, 179, 237, 0.05)) !important;
-        color: #e2e8f0 !important;
-    }
-    section[data-testid="stSidebar"] .stButton>button:hover {
-        background: linear-gradient(135deg, rgba(99, 179, 237, 0.3), rgba(99, 179, 237, 0.1)) !important;
-        border: 1px solid rgba(99, 179, 237, 0.7) !important;
-    }
-    button[data-testid="baseButton-headerNoPadding"] { color: #ffffff !important; }
+if "theme" not in st.session_state:
+    st.session_state.theme = "night"
 
-    /* 🌟 聊天框与文本输入框 */
-    div[data-testid="stChatMessage"] { 
-        background-color: rgba(255, 255, 255, 0.08) !important; 
-        border-radius: 12px; padding: 15px; 
-        border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px;
-    }
-    div[data-testid="stChatMessage"] p { color: #ffffff !important; }
-    div[data-testid="stChatInput"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(99, 179, 237, 0.4) !important; }
-    div[data-testid="stChatInput"] textarea { color: #ffffff !important; }
-    div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
+if st.session_state.theme == "night":
+    theme_css = """
+    <style>
+        .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
+        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
+        section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; border-right: 1px solid rgba(255, 255, 255, 0.1); }
+        section[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+        div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 10px; }
+        div[data-testid="stChatMessage"] p { color: #ffffff !important; }
+        div[data-testid="stChatInput"] { background-color: rgba(255, 255, 255, 0.08) !important; border: 1px solid rgba(0, 180, 216, 0.5) !important; border-radius: 12px !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #ffffff !important; caret-color: #00b4d8 !important; }
+        div[data-testid="stChatInput"] textarea::placeholder { color: #a0aec0 !important; }
+        div[data-testid="stAlert"] { background-color: rgba(255, 255, 255, 0.05) !important; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
+        div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
+        div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
+        div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; }
+        .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 180, 216, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; padding: 12px 20px !important; }
+        .stButton>button:hover { background: linear-gradient(135deg, rgba(0, 180, 216, 0.3), rgba(0, 180, 216, 0.1)) !important; border: 1px solid rgba(0, 180, 216, 0.7) !important; }
+        .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
+        .status-label { font-size: 12px; color: #a0aec0 !important; margin-bottom: 6px; }
+        .status-value { font-size: 22px; font-weight: 800; }
+        .status-trust .status-value { color: #00b4d8 !important; } .status-action .status-value { color: #f6e05e !important; } .status-disease .status-value { color: #e63946 !important; }
+        .vital-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #00b4d8; }
+        .vital-label { font-size: 11px; color: #a0aec0 !important; } .vital-value { font-size: 17px; font-weight: 700; color: #ffffff !important; }
+        .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .easy-card { background: linear-gradient(145deg, rgba(72, 187, 120, 0.15), rgba(72, 187, 120, 0.05)); border: 1px solid rgba(72, 187, 120, 0.4); }
+        .hard-card { background: linear-gradient(145deg, rgba(230, 57, 70, 0.15), rgba(230, 57, 70, 0.05)); border: 1px solid rgba(230, 57, 70, 0.4); }
+        .card-title { font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 15px; }
+        .easy-title { color: #68d391 !important; } .hard-title { color: #fc8181 !important; }
+        .card-desc { font-size: 15px; color: #cbd5e0 !important; line-height: 1.6; text-align: center; }
+        .feature-list { list-style-type: none; padding-left: 0; }
+        .feature-list li { font-size: 14px; color: #e2e8f0 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
+        .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #68d391 !important; font-weight: bold; }
+        .hard-card .feature-list li:before { content: "⚡"; color: #fc8181 !important; }
+        code { background-color: rgba(0, 0, 0, 0.4) !important; color: #00b4d8 !important; }
+        pre { background-color: rgba(0, 0, 0, 0.4) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 10px !important; }
+    </style>
+    """
+else:
+    theme_css = """
+    <style>
+        .stApp { background-color: #f0f4f8 !important; color: #1a202c !important; }
+        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #1a202c !important; }
+        section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
+        section[data-testid="stSidebar"] * { color: #1a202c !important; }
+        div[data-testid="stChatMessage"] { background-color: #ffffff !important; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        div[data-testid="stChatMessage"] p { color: #1a202c !important; }
+        div[data-testid="stChatInput"] { background-color: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 12px !important; }
+        div[data-testid="stChatInput"] textarea { background-color: transparent !important; color: #1a202c !important; caret-color: #0077b6 !important; }
+        div[data-testid="stChatInput"] textarea::placeholder { color: #718096 !important; }
+        div[data-testid="stAlert"] { background-color: #ffffff !important; border-radius: 12px; border: 1px solid #e2e8f0; }
+        div[data-testid="stAlert"] p { color: #1a202c !important; }
+        div[data-testid="stExpander"] > details { background-color: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; }
+        div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #1a202c !important; font-weight: bold !important; }
+        div[data-testid="stExpander"] > details > summary svg { fill: #1a202c !important; }
+        .stButton>button { border-radius: 12px !important; border: 1px solid #0077b6 !important; background: #ffffff !important; color: #0077b6 !important; font-weight: 500 !important; padding: 12px 20px !important; }
+        .stButton>button:hover { background: #e6f2ff !important; box-shadow: 0 4px 12px rgba(0, 119, 182, 0.2) !important; }
+        .status-badge { background: #ffffff; border-radius: 14px; padding: 15px; border: 1px solid #e2e8f0; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .status-label { font-size: 12px; color: #718096 !important; margin-bottom: 6px; }
+        .status-value { font-size: 22px; font-weight: 800; }
+        .status-trust .status-value { color: #0077b6 !important; } .status-action .status-value { color: #d69e2e !important; } .status-disease .status-value { color: #c53030 !important; }
+        .vital-item { background: #ffffff; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #0077b6; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .vital-label { font-size: 11px; color: #718096 !important; } .vital-value { font-size: 17px; font-weight: 700; color: #1a202c !important; }
+        .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .easy-card { background: #ffffff; border: 2px solid #48bb78; }
+        .hard-card { background: #ffffff; border: 2px solid #e53e3e; }
+        .card-title { font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 15px; }
+        .easy-title { color: #2f855a !important; } .hard-title { color: #c53030 !important; }
+        .card-desc { font-size: 15px; color: #4a5568 !important; line-height: 1.6; text-align: center; }
+        .feature-list { list-style-type: none; padding-left: 0; }
+        .feature-list li { font-size: 14px; color: #4a5568 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
+        .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #48bb78 !important; font-weight: bold; }
+        .hard-card .feature-list li:before { content: "⚡"; color: #e53e3e !important; }
+        code { background-color: #edf2f7 !important; color: #0077b6 !important; }
+        pre { background-color: #edf2f7 !important; border: 1px solid #e2e8f0 !important; border-radius: 10px !important; }
+    </style>
+    """
+st.markdown(theme_css, unsafe_allow_html=True)
 
-    /* 🌟 弹窗/信息提示框 */
-    div[data-testid="stAlert"] { 
-        background-color: rgba(255, 255, 255, 0.05) !important; 
-        border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    div[data-testid="stAlert"] p { color: #e2e8f0 !important; }
-    div[data-testid="stAlert"] svg { fill: #63b3ed !important; }
-
-    /* 🌟 展开菜单（工具箱/线索夹） */
-    div[data-testid="stExpander"] { background-color: transparent !important; }
-    div[data-testid="stExpander"] > details { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; }
-    div[data-testid="stExpander"] > details > summary { background-color: transparent !important; color: #ffffff !important; font-weight: bold !important; }
-    div[data-testid="stExpander"] > details > summary:hover { color: #63b3ed !important; }
-    div[data-testid="stExpander"] > details > summary svg { fill: #ffffff !important; color: #ffffff !important; }
-    div[data-testid="stExpander"] > details > div { background-color: transparent !important; }
-    
-    /* 🌟 模式卡片 */
-    .mode-card { padding: 30px; border-radius: 20px; margin-bottom: 20px; backdrop-filter: blur(10px); transition: all 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-    .mode-card:hover { transform: translateY(-8px); box-shadow: 0 16px 48px rgba(0,0,0,0.6); }
-    .easy-card { background: linear-gradient(145deg, rgba(72, 187, 120, 0.15), rgba(72, 187, 120, 0.05)); border: 1px solid rgba(72, 187, 120, 0.4); }
-    .hard-card { background: linear-gradient(145deg, rgba(229, 62, 62, 0.15), rgba(229, 62, 62, 0.05)); border: 1px solid rgba(229, 62, 62, 0.4); }
-    .card-title { font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 15px; }
-    .easy-title { color: #68d391 !important; } .hard-title { color: #fc8181 !important; }
-    .card-desc { font-size: 15px; color: #cbd5e0 !important; line-height: 1.6; margin-bottom: 15px; text-align: center; }
-    .feature-list { list-style-type: none; padding-left: 0; }
-    .feature-list li { font-size: 14px; color: #e2e8f0 !important; margin-bottom: 10px; padding-left: 24px; position: relative; }
-    .feature-list li:before { content: "✔"; position: absolute; left: 0; color: #68d391 !important; font-weight: bold; font-size: 16px; }
-    .hard-card .feature-list li:before { content: "⚡"; color: #fc8181 !important; }
-    
-    /* 🌟 顶部状态条 */
-    .status-bar { display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
-    .status-badge { flex: 1; min-width: 150px; background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
-    .status-label { font-size: 12px; color: #a0aec0 !important; margin-bottom: 6px; }
-    .status-value { font-size: 22px; font-weight: 800; }
-    .status-trust .status-value { color: #63b3ed !important; } .status-action .status-value { color: #f6e05e !important; } .status-disease .status-value { color: #f56565 !important; }
-    
-    /* 🌟 按钮通用样式 */
-    .stButton>button { border-radius: 12px !important; border: 1px solid rgba(99, 179, 237, 0.4) !important; background: linear-gradient(135deg, rgba(99, 179, 237, 0.15), rgba(99, 179, 237, 0.05)) !important; color: #e2e8f0 !important; font-weight: 500 !important; transition: all 0.3s ease !important; padding: 12px 20px !important; }
-    .stButton>button:hover { background: linear-gradient(135deg, rgba(99, 179, 237, 0.3), rgba(99, 179, 237, 0.1)) !important; border: 1px solid rgba(99, 179, 237, 0.7) !important; box-shadow: 0 0 20px rgba(99, 179, 237, 0.3) !important; }
-    
-    /* 🌟 生命体征卡片 */
-    .vital-item { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid #63b3ed; }
-    .vital-label { font-size: 11px; color: #a0aec0 !important; } .vital-value { font-size: 17px; font-weight: 700; color: #ffffff !important; }
-</style>
-""", unsafe_allow_html=True)
+st.sidebar.markdown("### 🎨 主题设置")
+if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" else "🌙 夜晚模式"):
+    st.session_state.theme = "day" if st.session_state.theme == "night" else "night"
+    st.rerun()
+st.sidebar.caption(f"当前主题：{'🌙 夜晚' if st.session_state.theme == 'night' else '☀️ 白天'}")
 
 # ================= 3. 游戏模式选择 =================
 if "game_mode" not in st.session_state:
-    st.markdown('<div class="game-main-title">🏥 急诊室疑云</div>', unsafe_allow_html=True)
-    st.markdown('<div class="game-sub-title">2岁患儿的犬吠声 · 请选择你的游戏难度</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 44px; font-weight: 900; color: #00b4d8; margin-top: 20px; margin-bottom: 10px; letter-spacing: 3px;">🏥 急诊室疑云</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 18px; color: #a0aec0; margin-bottom: 40px;">2岁患儿的犬吠声 · 请选择你的游戏难度</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2, gap="large")
     with col1:
@@ -141,7 +143,6 @@ st.sidebar.markdown("### 📱 显示设置")
 if "view_mode" not in st.session_state: st.session_state.view_mode = "desktop"
 if st.sidebar.button("切换手机/电脑视图"):
     st.session_state.view_mode = "mobile" if st.session_state.view_mode == "desktop" else "desktop"; st.rerun()
-st.sidebar.caption(f"当前视图：{'电脑端（三栏）' if st.session_state.view_mode == 'desktop' else '手机端（单栏）'}")
 
 st.sidebar.markdown("### 👨‍🏫 教师入口")
 if st.sidebar.button("📊 打开教师仪表盘"): st.session_state.page = "teacher"
@@ -291,8 +292,25 @@ def advance_period(is_decision_phase=False):
     elif st.session_state.disease_progress >= 70:
         st.session_state.messages.append({"role": "assistant", "content": "⚠️ 患儿出现明显三凹征，喉鸣音加重！情况紧急！"})
 
+# 🌟 语音转文字函数
+def speech_to_text(audio_file):
+    """调用智谱AI的语音识别接口"""
+    try:
+        with open("temp_audio.wav", "wb") as f:
+            f.write(audio_file.read())
+        with open("temp_audio.wav", "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model=ASR_MODEL,
+                file=f
+            )
+        os.remove("temp_audio.wav")
+        return transcript.text
+    except Exception as e:
+        st.toast(f"⚠️ 语音识别失败：{e}", icon="⚠️")
+        return None
+
 # ================= 7. 界面布局 =================
-st.markdown(f'<div class="status-bar"><div class="status-badge status-trust"><div class="status-label">❤️ 家长信任值</div><div class="status-value">{st.session_state.trust_score} / 100</div></div><div class="status-badge status-action"><div class="status-label">⏳ 剩余行动点</div><div class="status-value">{st.session_state.action_points} / {5 if mode == "easy" else 3}</div></div><div class="status-badge status-disease"><div class="status-label">⚠️ 病情进展度</div><div class="status-value">{st.session_state.disease_progress} / 100</div></div></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;"><div class="status-badge status-trust"><div class="status-label">❤️ 家长信任值</div><div class="status-value">{st.session_state.trust_score} / 100</div></div><div class="status-badge status-action"><div class="status-label">⏳ 剩余行动点</div><div class="status-value">{st.session_state.action_points} / {5 if mode == "easy" else 3}</div></div><div class="status-badge status-disease"><div class="status-label">⚠️ 病情进展度</div><div class="status-value">{st.session_state.disease_progress} / 100</div></div></div>', unsafe_allow_html=True)
 
 if st.session_state.view_mode == "desktop":
     col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
@@ -449,7 +467,7 @@ if st.session_state.view_mode == "desktop":
                         st.toast("❌ 听诊错误！病情加重 +10", icon="🚨")
                     st.rerun()
         else:
-            with st.container(height=450):
+            with st.container(height=420):
                 for msg in st.session_state.messages:
                     with st.chat_message(msg["role"]): st.write(msg["content"])
             if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "decision":
@@ -508,7 +526,24 @@ if st.session_state.view_mode == "desktop":
                     if mode == "easy": st.info("👉 请根据现有线索，做出初步诊断。")
                     else: st.info("👉 时间紧迫，请根据你的专业判断给出诊断。")
                 else:
-                    if prompt := st.chat_input("请输入你的问诊、查体或检查操作..."):
+                    # 🌟 语音输入区
+                    st.markdown("---")
+                    st.caption("🎙️ **语音输入（点击下方麦克风录制）**：")
+                    audio_value = st.audio_input("🎙️ 点击录音", key="voice_input")
+                    
+                    prompt = None
+                    if audio_value is not None:
+                        with st.spinner("🎙️ 正在识别语音..."):
+                            prompt = speech_to_text(audio_value)
+                        if prompt:
+                            st.success(f"✅ 识别成功：{prompt}")
+                    
+                    # 文字输入区
+                    text_prompt = st.chat_input("或输入你的问诊、查体或检查操作...")
+                    if text_prompt:
+                        prompt = text_prompt
+                    
+                    if prompt:
                         if st.session_state.action_points <= 0: st.warning("行动点已用完！请点击左侧『进入下一幕』。")
                         else:
                             st.session_state.action_points -= 1; st.session_state.last_action_time = time.time()
@@ -539,7 +574,11 @@ if st.session_state.view_mode == "desktop":
                             reply_text = None
                             try:
                                 tone_prompt = "非常焦虑和自责" if st.session_state.trust_score < 40 else ("有些紧张但配合" if st.session_state.trust_score < 70 else "信任医生并感激")
-                                ai_prompt = f"你是2岁急性喉炎患儿的妈妈。当前情绪：{tone_prompt}。事实：前天白天流鼻涕，凌晨1点半突发犬吠样咳嗽。\n【对话历史】\n{history_text}\n【铁律】1.对医生说话。2.句子完整。3.回复50字以内。\n医生刚刚说：'{prompt}'\n请直接回答医生："
+                                ai_prompt = f"""你正在扮演一个【2岁急性喉炎患儿的妈妈】，你没有任何医学背景，只是一个极度焦虑、自责的普通母亲。
+                                你的女儿小雨，2岁3个月，前天白天流鼻涕，凌晨1点半突发咳嗽。
+                                【你的对话铁律】1.绝对禁止说出任何医学术语！不能说“犬吠样咳嗽”、“吸气性喉鸣”、“三凹征”、“急性喉炎”等。你只能用大白话描述，比如“咳起来像小狗叫”、“嗓子哑了”、“吸气的时候胸口凹进去一块”、“声音很吓人”。2.绝对禁止给出任何诊断结论！3.禁止自言自语，请直接回答医生的问题。4.只能用口语化表达，可以带哭腔、结巴、感叹词。5.每次回复控制在50字以内。
+                                【对话历史】{history_text}
+                                医生刚刚说："{prompt}"。请直接回答医生："""
                                 ai_response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": ai_prompt}], temperature=0.4, timeout=3)
                                 reply_text = ai_response.choices[0].message.content.strip()
                             except Exception: reply_text = get_local_reply(prompt, st.session_state.trust_score, st.session_state.time_period)
@@ -596,13 +635,22 @@ else:
                     if "吸气性喉鸣" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("吸气性喉鸣")
                 st.rerun()
     else:
-        with st.container(height=500):
+        with st.container(height=400):
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]): st.write(msg["content"])
-        if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
-            if prompt := st.chat_input("请输入问诊、查体或检查操作..."):
-                if st.session_state.action_points > 0:
-                    st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
+        # 🌟 手机端语音输入
+        st.markdown("---")
+        st.caption("🎙️ 语音输入：")
+        audio_value = st.audio_input("点击录音", key="m_voice_input")
+        prompt = None
+        if audio_value is not None:
+            with st.spinner("识别中..."):
+                prompt = speech_to_text(audio_value)
+            if prompt: st.success(f"✅ {prompt}")
+        text_prompt = st.chat_input("或输入问诊、查体或检查操作...")
+        if text_prompt: prompt = text_prompt
+        if prompt and st.session_state.action_points > 0:
+            st.session_state.action_points -= 1; st.session_state.messages.append({"role": "user", "content": prompt}); st.rerun()
 
 # ================= 8. 游戏结算与复盘 =================
 if st.session_state.game_over:
