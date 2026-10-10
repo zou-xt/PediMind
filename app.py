@@ -164,14 +164,15 @@ if st.session_state.screen == "start":
     st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 100px; letter-spacing: 8px;">🏥 PediMind</div>', unsafe_allow_html=True)
     st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急症风云</div>', unsafe_allow_html=True)
     
+    # 🌟 修改点：将小字改为整个游戏的通用介绍
     st.markdown("""
     <div style="text-align: center; max-width: 700px; margin: 0 auto 60px auto; line-height: 2; font-size: 16px; color: #cbd5e0;">
-        凌晨两点，急诊室的门被猛地推开。<br>
-        一个焦虑的母亲抱着她2岁的孩子冲了进来。<br>
-        哭声、喘息、求救的眼神……<br>
-        <span style="color: #00b4d8; font-weight: bold;">你是今晚的值班医生。</span><br>
+        <span style="color: #00b4d8; font-weight: bold;">欢迎来到 PediMind 儿科急诊模拟器。</span><br>
+        在这里，你将扮演一名急诊科医生，面对各种凶险的儿科急症。<br>
         问诊、查体、鉴别诊断、紧急处理——<br>
-        你的每一个决策，都将决定患儿的生死。
+        每一次决策，都是一次临床思维的实战演练。<br>
+        <br>
+        做好准备，迎接属于你的“急症风云”了吗？
     </div>
     """, unsafe_allow_html=True)
     
