@@ -406,149 +406,97 @@ def render_monitor(disease_progress: int):
     else:
         hr, spo2, rr, status = 180, 82, 55, "critical"
 
-    hr_color = "#22ff88" if status == "normal" else \
-               "#ffcc00" if status == "warn" else \
-               "#ff3b3b"
+    hr_color = "#22ff88" if status == "normal" else "#ffcc00" if status == "warn" else "#ff3b3b"
 
     html_code = f"""
-    <div id="monitorRoot" style="width:100%;height:240px;background:#000808;border:2px solid #00cc66;border-radius:14px;overflow:hidden;position:relative;box-shadow:0 0 18px rgba(0,255,120,0.25);">
-        <canvas id="ecgCanvas" style="position:absolute;left:0;top:0;width:100%;height:100%;display:block;"></canvas>
+    <div style="width:100%; height:260px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
+        <canvas id="ecgCanvas" width="800" height="260" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
 
-        <div style="position:absolute;top:12px;right:14px;font-family:'Courier New',monospace;background:rgba(0,0,0,0.65);padding:10px 14px;border-radius:10px;z-index:3;border:1px solid rgba(0,255,120,0.3);">
+        <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
-            <div id="hrValue" style="font-size:34px;font-weight:bold;color:{hr_color};text-shadow:0 0 10px {hr_color};">{hr}</div>
+            <div style="font-size:34px;font-weight:bold;color:{hr_color};text-shadow:0 0 10px {hr_color};">{hr}</div>
 
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
-            <div id="spoValue" style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{spo2}</div>
+            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{spo2}</div>
 
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
-            <div id="rrValue" style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{rr}</div>
+            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{rr}</div>
         </div>
     </div>
 
     <script>
-    if(window._ecgTimer){{ clearInterval(window._ecgTimer); }}
-    if(window._ecgCanvas){{ window._ecgCanvas = null; }}
-
-    const root = document.getElementById('monitorRoot');
+    if(window._ecgTimer) clearInterval(window._ecgTimer);
     const canvas = document.getElementById('ecgCanvas');
     if(!canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = root.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(rect.height * dpr);
-
     const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const W = rect.width;
-    const H = rect.height;
+    const W = canvas.width;
+    const H = canvas.height;
     const midY = H * 0.52;
-    const amplitude = H * 0.38;
+    const amplitude = H * 0.32;
 
     let offset = 0;
-    const speed = 0.045;
-    const beatCount = 3.2;
+    const speed = 0.04;
 
-    function drawGrid(){{
-        ctx.fillStyle = '#000808';
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.strokeStyle = 'rgba(0,120,60,0.18)';
-        ctx.lineWidth = 0.5;
-        for(let x = 0; x < W; x += 24){{
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, H);
-            ctx.stroke();
-        }}
-        for(let y = 0; y < H; y += 24){{
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(W, y);
-            ctx.stroke();
-        }}
-
-        ctx.strokeStyle = 'rgba(0,200,100,0.35)';
-        ctx.lineWidth = 0.8;
-        for(let x = 0; x < W; x += 120){{
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, H);
-            ctx.stroke();
-        }}
-        for(let y = 0; y < H; y += 120){{
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(W, y);
-            ctx.stroke();
-        }}
-    }}
-
-    function ecgPoint(t){{
-        const x = (t % beatCount) / beatCount;
+    // 标准P-QRS-T心电波形
+    function getEcgVal(t) {
+        const p = (t % 1.0);
         let v = 0;
-
-        if(x > 0.08 && x < 0.18){{
-            v = 0.15 * Math.exp(-Math.pow((x - 0.13) / 0.025, 2));
-        }}
-
-        if(x > 0.18 && x < 0.26){{
-            v = -0.20 * Math.exp(-Math.pow((x - 0.22) / 0.008, 2));
-        }}
-
-        if(x > 0.26 && x < 0.34){{
-            v = 1.15 * Math.exp(-Math.pow((x - 0.30) / 0.008, 2));
-        }}
-
-        if(x > 0.34 && x < 0.42){{
-            v = -0.28 * Math.exp(-Math.pow((x - 0.38) / 0.012, 2));
-        }}
-
-        if(x > 0.46 && x < 0.72){{
-            v = 0.30 * Math.exp(-Math.pow((x - 0.59) / 0.055, 2));
-        }}
-
+        // P波
+        if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
+        // Q波
+        if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
+        // R波
+        if(p>0.18 && p<0.23) v += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
+        // S波
+        if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
+        // T波
+        if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
         return v;
-    }}
+    }
 
-    function drawECG(){{
+    function drawGrid() {
+        ctx.fillStyle="#000808";
+        ctx.fillRect(0,0,W,H);
+        // 小格子
+        ctx.strokeStyle="rgba(0,120,60,0.18)";
+        ctx.lineWidth=0.5;
+        for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+        for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+        // 粗格子
+        ctx.strokeStyle="rgba(0,200,100,0.35)";
+        ctx.lineWidth=0.8;
+        for(let x=0;x<W;x+=120){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+        for(let y=0;y<H;y+=120){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    }
+
+    function drawWave() {
         ctx.beginPath();
-        ctx.strokeStyle = '#22ff88';
-        ctx.lineWidth = 2.1;
-        ctx.shadowColor = '#22ff88';
-        ctx.shadowBlur = 10;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-
-        for(let x = 0; x < W; x++){{
-            const t = (x + offset) * 0.042;
-            const y = midY - ecgPoint(t) * amplitude;
-            if(x === 0){{
-                ctx.moveTo(x, y);
-            }} else {{
-                ctx.lineTo(x, y);
-            }}
-        }}
-
+        ctx.strokeStyle="#22ff88";
+        ctx.lineWidth=2.2;
+        ctx.shadowColor="#22ff88";
+        ctx.shadowBlur=10;
+        ctx.lineJoin="round";
+        for(let x=0;x<W;x++){
+            const t = (x * 0.0025) + offset;
+            const val = getEcgVal(t);
+            const y = midY - val * amplitude;
+            if(x===0) ctx.moveTo(x,y);
+            else ctx.lineTo(x,y);
+        }
         ctx.stroke();
-        ctx.shadowBlur = 0;
-    }}
+        ctx.shadowBlur=0;
+    }
 
-    function loop(){{
+    function render() {
         drawGrid();
-        drawECG();
+        drawWave();
         offset += speed;
-    }}
-
-    loop();
-    window._ecgTimer = setInterval(loop, 34);
-    window._ecgCanvas = canvas;
+    }
+    render();
+    window._ecgTimer = setInterval(render, 35);
     </script>
     """
-
-    components.html(html_code, height=250, scrolling=False)
+    st.components.v1.html(html_code, height=270, scrolling=False)
 
 # ================= 新增：病情进度夹紧工具函数 =================
 def adjust_disease_progress(delta:int):
