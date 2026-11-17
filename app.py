@@ -397,6 +397,7 @@ def render_message(role: str, content: str):
 
 # ================= 6. 优化版心电监护仪 =================
 def render_monitor(disease_progress: int):
+    # 根据病情度计算生命体征
     if disease_progress < 40:
         hr, spo2, rr, status = 120, 97, 28, "normal"
     elif disease_progress < 70:
@@ -414,92 +415,86 @@ def render_monitor(disease_progress: int):
         hr_color = "#ff3b3b"
 
     html_code = """
-    <div style="width:100%; height:260px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
-        <canvas id="ecgCanvas" width="800" height="260" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
-
-        <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
-            <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
-            <div style="font-size:34px;font-weight:bold;color:HR_COLOR_PLACEHOLDER;text-shadow:0 0 10px HR_COLOR_PLACEHOLDER;">HR_VAL_PLACEHOLDER</div>
-
-            <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
-            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">SPO_VAL_PLACEHOLDER</div>
-
-            <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
-            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">RR_VAL_PLACEHOLDER</div>
-        </div>
+<div style="width:100%; min-height:260px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
+    <canvas id="ecgCanvas" width="800" height="260" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
+    <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
+        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
+        <div style="font-size:34px;font-weight:bold;color:HR_COLOR_PLACEHOLDER;text-shadow:0 0 10px HR_COLOR_PLACEHOLDER;">HR_VAL_PLACEHOLDER</div>
+        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
+        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">SPO_VAL_PLACEHOLDER</div>
+        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
+        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">RR_VAL_PLACEHOLDER</div>
     </div>
+</div>
+<script>
+if(window._ecgTimer) clearInterval(window._ecgTimer);
+const canvas = document.getElementById('ecgCanvas');
+if(!canvas) return;
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+const midY = H * 0.52;
+const amplitude = H * 0.32;
+let offset = 0;
+const speed = 0.04;
 
-    <script>
-    if(window._ecgTimer) clearInterval(window._ecgTimer);
-    const canvas = document.getElementById('ecgCanvas');
-    if(!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
-    const midY = H * 0.52;
-    const amplitude = H * 0.32;
+function getEcgVal(t) {
+    const p = (t % 1.0);
+    let v = 0;
+    if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
+    if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
+    if(p>0.18 && p<0.23) v += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
+    if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
+    if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
+    return v;
+}
 
-    let offset = 0;
-    const speed = 0.04;
+function drawGrid() {
+    ctx.fillStyle="#000808";
+    ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle="rgba(0,120,60,0.18)";
+    ctx.lineWidth=0.5;
+    for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    ctx.strokeStyle="rgba(0,200,100,0.35)";
+    ctx.lineWidth=0.8;
+    for(let x=0;x<W;x+=120){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=120){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+}
 
-    function getEcgVal(t) {
-        const p = (t % 1.0);
-        let v = 0;
-        if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
-        if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
-        if(p>0.18 && p<0.23) v += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
-        if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
-        if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
-        return v;
+function drawWave() {
+    ctx.beginPath();
+    ctx.strokeStyle="#22ff88";
+    ctx.lineWidth=2.2;
+    ctx.shadowColor="#22ff88";
+    ctx.shadowBlur=10;
+    ctx.lineJoin="round";
+    for(let x=0;x<W;x++){
+        const t = (x * 0.0025) + offset;
+        const val = getEcgVal(t);
+        const y = midY - val * amplitude;
+        if(x===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
     }
+    ctx.stroke();
+    ctx.shadowBlur=0;
+}
 
-    function drawGrid() {
-        ctx.fillStyle="#000808";
-        ctx.fillRect(0,0,W,H);
-        ctx.strokeStyle="rgba(0,120,60,0.18)";
-        ctx.lineWidth=0.5;
-        for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-        for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-        ctx.strokeStyle="rgba(0,200,100,0.35)";
-        ctx.lineWidth=0.8;
-        for(let x=0;x<W;x+=120){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-        for(let y=0;y<H;y+=120){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    }
-
-    function drawWave() {
-        ctx.beginPath();
-        ctx.strokeStyle="#22ff88";
-        ctx.lineWidth=2.2;
-        ctx.shadowColor="#22ff88";
-        ctx.shadowBlur=10;
-        ctx.lineJoin="round";
-        for(let x=0;x<W;x++){
-            const t = (x * 0.0025) + offset;
-            const val = getEcgVal(t);
-            const y = midY - val * amplitude;
-            if(x===0) ctx.moveTo(x,y);
-            else ctx.lineTo(x,y);
-        }
-        ctx.stroke();
-        ctx.shadowBlur=0;
-    }
-
-    function render() {
-        drawGrid();
-        drawWave();
-        offset += speed;
-    }
-    render();
-    window._ecgTimer = setInterval(render, 35);
-    </script>
+function render() {
+    drawGrid();
+    drawWave();
+    offset += speed;
+}
+render();
+window._ecgTimer = setInterval(render, 35);
+</script>
     """
-    # 替换占位符
     html_code = html_code.replace("HR_COLOR_PLACEHOLDER", hr_color)
     html_code = html_code.replace("HR_VAL_PLACEHOLDER", str(hr))
     html_code = html_code.replace("SPO_VAL_PLACEHOLDER", str(spo2))
     html_code = html_code.replace("RR_VAL_PLACEHOLDER", str(rr))
 
-    st.components.v1.html(html_code, height=270, scrolling=False)
+    components.html(html_code, height=280, scrolling=False)
 
 # ================= 新增：病情进度夹紧工具函数 =================
 def adjust_disease_progress(delta:int):
@@ -809,18 +804,24 @@ if st.session_state.screen == "game":
 
     # ---------------- 左侧 ----------------
     with col_left:
-        st.subheader("📈 生命体征")
-        dp = st.session_state.disease_progress
-        render_monitor(dp)
-        if dp < 40: st.caption("🧠 意识：轻度烦躁")
-        elif dp < 70: st.caption("🧠 意识：明显烦躁")
-        elif dp < 90: st.caption("🧠 意识：发绀、烦躁")
-        else: st.caption("🧠 意识：意识模糊")
+    st.subheader("📈 生命体征")
+    dp = st.session_state.disease_progress
+    render_monitor(dp)
 
-        st.divider()
-        if not st.session_state.game_over:
-            tp = st.session_state.time_period
-            ap = st.session_state.action_points
+    if dp < 40:
+        st.caption("🧠 意识：轻度烦躁")
+    elif dp < 70:
+        st.caption("🧠 意识：明显烦躁")
+    elif dp < 90:
+        st.caption("🧠 意识：发绀、烦躁")
+    else:
+        st.caption("🧠 意识：意识模糊")
+
+st.divider()
+
+if not st.session_state.game_over:
+    tp = st.session_state.time_period
+    ap = st.session_state.action_points
 
             # 第一幕 → 第二幕
             if tp == 1:
