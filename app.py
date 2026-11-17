@@ -240,53 +240,173 @@ def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
     return None
 
 # ================= 3. 成就系统 =================
-ACHIEVEMENTS = {
-    "first_inquiry": {"icon": "🩺", "name": "初次问诊", "desc": "迈出问诊第一步"},
-    "all_clues":     {"icon": "🔍", "name": "明察秋毫", "desc": "集齐全部线索"},
-    "correct_dx":    {"icon": "🎯", "name": "一针见血", "desc": "初步诊断完全正确"},
-    "lifesaver":     {"icon": "⚡", "name": "妙手回春", "desc": "急救处置正确 ≥2 次，未呼叫上级支援"},
-    "empathy":       {"icon": "💬", "name": "医者仁心", "desc": "用共情方式交代病情"},
-    "perfect":       {"icon": "🏆", "name": "急诊之光", "desc": "最终得分 ≥ 80，未呼叫上级支援"},
+# ================= 3. 成就系统【通用 + 分病例专属成就】 =================
+# 通用成就（全部病例可用）
+COMMON_ACHIEVEMENTS = {
+    "common_first_inquiry": {"icon": "🩺", "name": "初次问诊", "desc": "迈出问诊第一步"},
+    "common_all_clues":     {"icon": "🔍", "name": "明察秋毫", "desc": "集齐本局全部线索"},
+    "common_correct_dx":    {"icon": "🎯", "name": "一针见血", "desc": "初步诊断完全正确"},
+    "common_empathy":       {"icon": "💬", "name": "医者仁心", "desc": "使用共情话术交代病情"},
+    "common_perfect":       {"icon": "🏆", "name": "急诊之光", "desc": "本局得分≥80，未呼叫上级支援"},
 }
 
+# 病例专属成就，key和CASES_CONFIG病例id一一对应
+CASE_SPECIAL_ACHIEVEMENTS = {
+    "laryngitis": {
+        "laryngitis_calm_larynx": {"icon": "🌬️", "name": "冷静控喉", "desc": "急性喉炎：保持患儿安静，不触发哭闹加重水肿"},
+        "laryngitis_no_laryngoscope": {"icon": "🛡️", "name": "规避喉痉挛", "desc": "急性喉炎：没有使用压舌板强行检查咽喉，避免致命喉痉挛"},
+    },
+    "foreign_body": {
+        "foreign_body_heim": {"icon": "⚡", "name": "生死海姆立克", "desc": "气道异物：正确实施海姆立克/拍背压胸急救"},
+        "foreign_body_no_dig": {"icon": "🚫", "name": "拒绝盲目抠挖", "desc": "气道异物：没有手指盲目抠挖咽部，防止异物推深"},
+    },
+    "asthma": {
+        "asthma_relief": {"icon": "💨", "name": "平喘先锋", "desc": "支气管哮喘：正确使用支气管舒张剂急救"},
+        "asthma_no_abx": {"icon": "✅", "name": "理性不用抗生素", "desc": "支气管哮喘：没有滥用抗生素治疗哮喘"},
+    },
+    "epiglottitis": {
+        "epiglottis_protect": {"icon": "🛡️", "name": "会厌守护神", "desc": "急性会厌炎：全程没有强行压舌板查体"},
+        "epiglottis_prepare_airway": {"icon": "🩻", "name": "气道预备", "desc": "急性会厌炎：选择正确处置，提前做好气道抢救准备"},
+    }
+}
+
+# 合并全部成就，用于展览馆渲染
+def get_all_achievement_dict():
+    all_ach = dict(COMMON_ACHIEVEMENTS)
+    for case_id, ach_dict in CASE_SPECIAL_ACHIEVEMENTS.items():
+        all_ach.update(ach_dict)
+    return all_ach
+
 def unlock_achievement(aid):
+    """解锁成就，去重，不重复添加"""
+    if "achievements" not in st.session_state:
+        st.session_state.achievements = []
     if aid not in st.session_state.achievements:
         st.session_state.achievements.append(aid)
 
-def check_achievements(case):
+def check_achievements(case_id, case):
+    """
+    结算判断成就
+    :param case_id: 当前病例id字符串 laryngitis / foreign_body ...
+    :param case: CASES_CONFIG对应病例字典
+    """
     ss = st.session_state
+    # 初始化
+    if "achievements" not in ss:
+        ss.achievements = []
+
+    # ==========【通用成就判定】 ==========
     if any(m.get("role") == "user" for m in ss.messages):
-        unlock_achievement("first_inquiry")
+        unlock_achievement("common_first_inquiry")
     if len(ss.unlocked_clues) >= len(case["clues"]):
-        unlock_achievement("all_clues")
+        unlock_achievement("common_all_clues")
     if ss.diagnosis_made and case["diagnosis"].get(ss.diagnosis_made) == case["disease"]:
-        unlock_achievement("correct_dx")
-    # 没有呼叫支援，急救正确>=2次才解锁妙手回春
-    if ss.crisis_correct_count >= 2 and not ss.get("call_support_used", False):
-        unlock_achievement("lifesaver")
+        unlock_achievement("common_correct_dx")
     if ss.score_empathy > 0:
-        unlock_achievement("empathy")
-    #呼叫支援，禁止解锁急诊之光
+        unlock_achievement("common_empathy")
     if ss.final_score >= 80 and not ss.get("call_support_used", False):
-        unlock_achievement("perfect")
+        unlock_achievement("common_perfect")
 
-def render_achievements(container=st.sidebar):
-    container.markdown("### 🏅 成就墙")
-    cols = container.columns(3)
-    for i, (aid, a) in enumerate(ACHIEVEMENTS.items()):
-        unlocked = aid in st.session_state.get("achievements", [])
-        with cols[i % 3]:
-            icon_style = "" if unlocked else "filter:grayscale(1) opacity(0.35);"
-            bg     = "rgba(0,180,216,0.15)" if unlocked else "rgba(128,128,128,0.08)"
-            border = "#00b4d8" if unlocked else "rgba(150,150,150,0.35)"
-            name_color = "#00b4d8" if unlocked else "#8a94a6"
+    # ==========【病例专属成就判定】 ==========
+    if case_id == "laryngitis":
+        # 冷静控喉：本局危机没有选择【强行压舌板】选项
+        harm_opt_label = "强行按压患儿，用压舌板检查咽喉部"
+        if harm_opt_label not in ss.penalty_log:
+            unlock_achievement("laryngitis_no_laryngoscope")
+        # 危机正确处置至少1次
+        if ss.crisis_correct_count >=1:
+            unlock_achievement("laryngitis_calm_larynx")
+
+    elif case_id == "foreign_body":
+        # 生死海姆立克：正确急救执行
+        correct_label = "立即施行海姆立克急救法/拍背压胸"
+        if correct_label in [m for m in ss.messages if m.get("role")=="user"]:
+            unlock_achievement("foreign_body_heim")
+        # 没有手指抠挖
+        harm_dig = "用手指盲目抠挖咽喉"
+        if harm_dig not in ss.penalty_log:
+            unlock_achievement("foreign_body_no_dig")
+
+    elif case_id == "asthma":
+        correct_ast = "吸氧，雾化吸入支气管舒张剂(沙丁胺醇)"
+        if correct_ast in [m.get("content") for m in ss.messages if m.get("role")=="user"]:
+            unlock_achievement("asthma_relief")
+        abx_opt = "静脉滴注抗生素"
+        if abx_opt not in ss.penalty_log:
+            unlock_achievement("asthma_no_abx")
+
+    elif case_id == "epiglottitis":
+        harm_epi = "强行使用压舌板检查咽喉部"
+        if harm_epi not in ss.penalty_log:
+            unlock_achievement("epiglottis_protect")
+        correct_epi = "保持坐位，吸氧，静脉使用糖皮质激素，准备气管切开/插管"
+        if correct_epi in [m.get("content") for m in ss.messages if m.get("role")=="user"]:
+            unlock_achievement("epiglottis_prepare_airway")
+
+def render_mini_achievements(container=st.sidebar):
+    """侧边栏迷你展示本局已解锁成就（小缩略）"""
+    container.markdown("### 🏅本局成就")
+    all_ach = get_all_achievement_dict()
+    unlocked_list = st.session_state.get("achievements", [])
+    show_items = [all_ach[aid] for aid in unlocked_list if aid in all_ach]
+    if len(show_items) == 0:
+        container.caption("暂未解锁成就")
+        return
+    html_parts = []
+    for item in show_items[-6:]:
+        html_parts.append(f'<span title="{item["desc"]}" style="font-size:22px;margin:0 2px;">{item["icon"]}</span>')
+    container.markdown("".join(html_parts), unsafe_allow_html=True)
+
+def render_achievement_gallery_page():
+    """独立页面：完整成就展览馆"""
+    st.markdown('<div style="text-align:center;font-size:40px;font-weight:bold;color:#00b4d8;margin:20px 0;">🏅成就展览馆</div>',unsafe_allow_html=True)
+    unlocked_set = set(st.session_state.get("achievements", []))
+    all_dict = get_all_achievement_dict()
+
+    st.subheader("📌通用成就（全部病例）")
+    cols_com = st.columns(3)
+    for idx,(aid,ach) in enumerate(COMMON_ACHIEVEMENTS.items()):
+        with cols_com[idx%3]:
+            is_unlock = aid in unlocked_set
+            icon_style = "" if is_unlock else "filter:grayscale(1) opacity:0.3;"
+            bg = "rgba(0,180,216,0.15)" if is_unlock else "rgba(80,80,80,0.08)"
+            border = "#00b4d8" if is_unlock else "#444444"
             st.markdown(f"""
-            <div title="{a['desc']}" style="text-align:center; background:{bg}; border:1px solid {border};
-                        border-radius:12px; padding:10px 6px; margin-bottom:8px;">
-                <div style="font-size:26px; {icon_style}">{a['icon']}</div>
-                <div style="font-size:12px; font-weight:700; color:{name_color}; margin-top:4px;">{a['name']}</div>
-            </div>""", unsafe_allow_html=True)
+            <div title="{ach['desc']}" style="text-align:center;background:{bg};border:1px solid {border};border-radius:12px;padding:12px 8px;margin-bottom:10px;">
+                <div style="font-size:30px;{icon_style}">{ach['icon']}</div>
+                <div style="font-weight:bold;margin-top:6px;">{ach['name']}</div>
+                <div style="font-size:12px;opacity:0.7;margin-top:4px;">{ach['desc']}</div>
+            </div>""",unsafe_allow_html=True)
 
+    st.divider()
+    st.subheader("🩺病例专属成就")
+    case_name_map = {
+        "laryngitis":"2岁患儿的犬吠声｜急性感染性喉炎",
+        "foreign_body":"1岁患儿的剧烈呛咳｜气道异物",
+        "asthma":"4岁患儿的反复喘息｜支气管哮喘",
+        "epiglottitis":"3岁患儿的高热与流涎｜急性会厌炎"
+    }
+    for cid,ach_dict in CASE_SPECIAL_ACHIEVEMENTS.items():
+        st.markdown(f"#### 📂 {case_name_map[cid]}")
+        cols_case = st.columns(2)
+        for i,(aid,ach) in enumerate(ach_dict.items()):
+            with cols_case[i%2]:
+                is_unlock = aid in unlocked_set
+                icon_style = "" if is_unlock else "filter:grayscale(1) opacity:0.3;"
+                bg = "rgba(230,57,70,0.12)" if is_unlock else "rgba(80,80,80,0.08)"
+                border = "#e63946" if is_unlock else "#444444"
+                st.markdown(f"""
+                <div title="{ach['desc']}" style="text-align:center;background:{bg};border:1px solid {border};border-radius:12px;padding:12px 8px;margin-bottom:10px;">
+                    <div style="font-size:30px;{icon_style}">{ach['icon']}</div>
+                    <div style="font-weight:bold;margin-top:6px;">{ach['name']}</div>
+                    <div style="font-size:12px;opacity:0.7;margin-top:4px;">{ach['desc']}</div>
+                </div>""",unsafe_allow_html=True)
+        st.markdown("<br>",unsafe_allow_html=True)
+
+    st.divider()
+    if st.button("⬅️ 返回主菜单"):
+        st.session_state.screen = "start"
+        st.rerun()
 # ================= 4. 数据持久化层 (SQLite) =================
 DB_PATH = "pedimind_records.db"
 
