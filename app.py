@@ -97,8 +97,6 @@ CASES_CONFIG = {
 }
 
 # ================= 2.5 AI 对话层（表演层）与线索判定层 =================
-# 原则：判定归代码，表演归 LLM，异常归兜底。LLM 输出不参与任何数值计算。
-
 CLUE_SYNONYMS = {
     "犬吠样咳嗽":     ["小狗叫", "狗叫", "海豹叫", "空空声", "像狗", "犬吠", "croup"],
     "夜间加重":       ["半夜", "夜里", "晚上更", "夜间", "睡着后", "后半夜"],
@@ -126,7 +124,6 @@ BANNED_TERMS = [
     "糖皮质激素", "肾上腺素", "雾化", "地塞米松", "海姆立克", "插管", "气管切开",
 ]
 
-# 妈妈视角事实（信息隔离：不含病名/术语，模型想泄底也没料）
 MOM_FACTS = {
     "laryngitis": [
         "他咳起来像小狗叫，空空的，我从来没听过这种声音",
@@ -168,13 +165,10 @@ FALLBACK_REPLIES = {
     "default":      "医生，我真的好担心，求您快帮帮孩子吧！",
 }
 
-
 def _ai_available() -> bool:
     return bool(API_KEY) and "你的" not in str(API_KEY) and len(str(API_KEY)) > 20
 
-
 def match_clues(prompt: str, case: dict) -> list:
-    """判定层：确定性匹配，返回命中线索列表。"""
     text = prompt.lower()
     hits = []
     for clue in case["clues"]:
@@ -182,7 +176,6 @@ def match_clues(prompt: str, case: dict) -> list:
         if any(s.lower() in text for s in synonyms):
             hits.append(clue)
     return hits
-
 
 def sanitize_reply(reply):
     if not isinstance(reply, str):
@@ -194,13 +187,11 @@ def sanitize_reply(reply):
         return None
     return reply
 
-
 def pick_fallback(hit_clues: list) -> str:
     for c in hit_clues:
         if c in FALLBACK_REPLIES:
             return FALLBACK_REPLIES[c]
     return FALLBACK_REPLIES["default"]
-
 
 def build_mom_system(case_id: str, case: dict) -> str:
     facts = MOM_FACTS.get(case_id, [])
@@ -216,7 +207,6 @@ def build_mom_system(case_id: str, case: dict) -> str:
 4. 医生问到你不知道的，就说"这我也不懂啊医生"。
 5. 只输出 JSON：{{"reply": "你的回答"}}，不要输出其他任何内容。"""
 
-
 def _clean_history(history: list) -> list:
     out = []
     for m in history:
@@ -225,7 +215,6 @@ def _clean_history(history: list) -> list:
             out.append({"role": "user" if m.get("role") == "user" else "assistant",
                         "content": c})
     return out
-
 
 def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
     if not _ai_available():
@@ -249,7 +238,6 @@ def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
         except Exception:
             continue
     return None
-
 
 # ================= 3. 成就系统 =================
 ACHIEVEMENTS = {
@@ -405,7 +393,7 @@ def render_message(role: str, content: str):
             </div>
         </div>""", unsafe_allow_html=True)
 
-# ================= 6. 心电监护仪 =================
+# ================= 6. 优化版心电监护仪 =================
 def render_monitor(disease_progress: int):
     if disease_progress < 40:
         hr, spo2, rr, status = 120, 97, 28, "normal"
@@ -423,12 +411,18 @@ def render_monitor(disease_progress: int):
       .monitor {{ position:relative; width:100%; height:180px; background:#02060a;
                  border-radius:10px; border:1px solid #0a3a2a; overflow:hidden; }}
       canvas {{ display:block; width:100%; height:100%; }}
+      
+      /* 背景加深，防止波形穿字 */
       .vitals {{ position:absolute; top:8px; right:12px; text-align:right;
-                font-family:'Courier New',monospace; }}
+                font-family:'Courier New',monospace;
+                background: rgba(0, 0, 0, 0.65); 
+                padding: 8px 12px; border-radius: 8px; 
+                backdrop-filter: blur(4px); z-index: 10; }}
       .vital-item {{ margin-bottom:4px; line-height:1.1; text-shadow:0 0 6px currentColor; }}
-      .vital-label {{ font-size:10px; opacity:0.65; letter-spacing:1px; color:#0f0; }}
+      .vital-label {{ font-size:10px; opacity:0.85; letter-spacing:1px; }}
       .vital-value {{ font-size:24px; font-weight:bold; }}
       .vital-unit  {{ font-size:10px; opacity:0.65; }}
+      
       .c-green {{ color:#22ff88; }} .c-yellow {{ color:#ffcc00; }} .c-red {{ color:#ff3b3b; }}
       .blink {{ animation:blink 0.6s infinite; }}
       @keyframes blink {{ 50% {{ opacity:0.25; }} }}
@@ -457,13 +451,14 @@ def render_monitor(disease_progress: int):
       }}
       window.addEventListener('resize', resize); resize();
 
+      // 真实感ECG波形
       function ecgSample(p) {{
         let v = 0;
-        v += 0.10 * Math.exp(-Math.pow((p-0.16)/0.022, 2));
-        v -= 0.08 * Math.exp(-Math.pow((p-0.245)/0.007, 2));
-        v += 1.00 * Math.exp(-Math.pow((p-0.27)/0.009, 2));
-        v -= 0.16 * Math.exp(-Math.pow((p-0.295)/0.010, 2));
-        v += 0.26 * Math.exp(-Math.pow((p-0.45)/0.040, 2));
+        v += 0.12 * Math.exp(-Math.pow((p-0.15)/0.015, 2)); 
+        v -= 0.15 * Math.exp(-Math.pow((p-0.24)/0.005, 2)); 
+        v += 1.15 * Math.exp(-Math.pow((p-0.25)/0.006, 2)); 
+        v -= 0.25 * Math.exp(-Math.pow((p-0.265)/0.008, 2)); 
+        v += 0.25 * Math.exp(-Math.pow((p-0.4)/0.03, 2));   
         return v;
       }}
 
@@ -471,9 +466,7 @@ def render_monitor(disease_progress: int):
       const data = new Array(BUFFER).fill(0);
       let phase = 0;
       const cycleDur = 60 / HR;
-      const sampleInterval = 0.008;
-      const perFrame = 2;
-      const dPhase = (sampleInterval / cycleDur) * perFrame;
+      let lastTime = performance.now();
 
       function drawGrid() {{
         ctx.lineWidth = 0.5;
@@ -486,24 +479,36 @@ def render_monitor(disease_progress: int):
       }}
 
       function drawWave() {{
-        const step = W / BUFFER, midY = H * 0.62, amp = H * 0.48;
+        const step = W / BUFFER, midY = H * 0.62, amp = H * 0.42;
         ctx.beginPath();
-        ctx.strokeStyle = color; ctx.lineWidth = 2;
-        ctx.shadowBlur = 8; ctx.shadowColor = color;
+        ctx.strokeStyle = color; 
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
         for (let i=0; i<BUFFER; i++) {{
           const x = i*step, y = midY - data[i]*amp;
           i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
         }}
-        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.stroke(); 
       }}
 
-      function loop() {{
+      function loop(now) {{
+        let dt = (now - lastTime) / 1000;
+        lastTime = now;
+        if (dt > 0.1) dt = 0.1; 
+
+        const sampleRate = 60; 
+        const perFrame = Math.max(1, Math.floor(dt * sampleRate));
+        const dPhase = (dt / cycleDur);
+
         for (let k=0; k<perFrame; k++) {{
-          phase = (phase + dPhase) % 1;
+          phase = (phase + dPhase / perFrame) % 1;
           let v = ecgSample(phase);
-          if (STATUS==="danger"||STATUS==="critical") v += (Math.random()-0.5)*0.08;
+          if (STATUS==="danger"||STATUS==="critical") {{
+              v += (Math.random()-0.5)*0.05;
+          }}
           data.push(v); data.shift();
         }}
+
         ctx.clearRect(0,0,W,H);
         drawGrid(); drawWave();
         requestAnimationFrame(loop);
@@ -546,6 +551,11 @@ if st.session_state.theme == "night":
         .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); }
         .case-card { padding: 25px; border-radius: 16px; margin-bottom: 20px; background: rgba(0, 180, 216, 0.05); border: 1px solid rgba(0, 180, 216, 0.3); }
         .case-card:hover { transform: translateY(-5px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        
+        /* 修复提示框内部文字对比度 */
+        div[data-testid="stAlert"] * {
+            color: #1a202c !important;
+        }
     </style>"""
 else:
     theme_css = """<style>
@@ -610,19 +620,65 @@ if st.session_state.screen == "case_select":
     if st.button("⬅️ 返回主菜单"): st.session_state.screen = "start"; st.rerun()
     st.stop()
 
-# 屏幕 3：难度选择
+# 屏幕 3：难度选择（优化版界面）
 if st.session_state.screen == "difficulty_select":
+    case = CASES_CONFIG[st.session_state.current_case]
+    
+    # 根据主题动态调整文字颜色
+    text_main = "#e2e8f0" if st.session_state.theme == "night" else "#1a202c"
+    text_sub  = "#a0aec0" if st.session_state.theme == "night" else "#4a5568"
+    
     st.markdown(f'<div style="text-align: center; font-size: 42px; font-weight: 900; color: #00b4d8; margin-top: 30px;">⚙️ 选择难度</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align: center; font-size: 16px; color: {text_sub}; margin-bottom: 40px;">当前病例：{case["name"]} - {case["disease"]}</div>', unsafe_allow_html=True)
+    
     col1, col2 = st.columns(2, gap="large")
+    
     with col1:
-        st.info("🌱 **简单模式**\n- 5个行动点\n- 初始信任值40\n- 有详细提示和引导")
-        if st.button("开始简单模式", use_container_width=True):
-            st.session_state.game_mode = "easy"; st.session_state.screen = "game"; st.rerun()
+        # 简单模式卡片
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)); 
+                    border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 16px; padding: 25px; 
+                    margin-bottom: 20px; height: 230px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <div style="font-size: 24px; font-weight: 800; color: #4ade80; margin-bottom: 15px;">🌱 简单模式</div>
+            <ul style="line-height: 2.2; color: {text_main}; margin-left: 20px; margin-bottom: 0; font-size: 15px;">
+                <li><b style="color: #4ade80;">5</b> 个行动点</li>
+                <li>初始信任值 <b style="color: #4ade80;">40</b></li>
+                <li>有详细提示和引导</li>
+                <li>适合初次体验游戏</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("▶ 开始简单模式", use_container_width=True, type="primary", key="btn_easy"):
+            st.session_state.game_mode = "easy"
+            st.session_state.screen = "game"
+            st.rerun()
+            
     with col2:
-        st.warning("🔥 **困难模式**\n- 3个行动点\n- 初始信任值20\n- 无提示，盲盒线索")
-        if st.button("开始困难模式", use_container_width=True):
-            st.session_state.game_mode = "hard"; st.session_state.screen = "game"; st.rerun()
-    if st.button("⬅️ 返回病例选择"): st.session_state.screen = "case_select"; st.rerun()
+        # 困难模式卡片
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05)); 
+                    border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 16px; padding: 25px; 
+                    margin-bottom: 20px; height: 230px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <div style="font-size: 24px; font-weight: 800; color: #f87171; margin-bottom: 15px;">🔥 困难模式</div>
+            <ul style="line-height: 2.2; color: {text_main}; margin-left: 20px; margin-bottom: 0; font-size: 15px;">
+                <li>仅 <b style="color: #f87171;">3</b> 个行动点</li>
+                <li>初始信任值 <b style="color: #f87171;">20</b></li>
+                <li>无提示，盲盒线索</li>
+                <li>高压生死挑战</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("▶ 开始困难模式", use_container_width=True, key="btn_hard"):
+            st.session_state.game_mode = "hard"
+            st.session_state.screen = "game"
+            st.rerun()
+            
+    st.markdown("<br>", unsafe_allow_html=True)
+    _, c_mid, _ = st.columns([1, 1, 1])
+    with c_mid:
+        if st.button("⬅️ 返回病例选择", use_container_width=True):
+            st.session_state.screen = "case_select"
+            st.rerun()
     st.stop()
 
 # ================= 9. 错题本 =================
