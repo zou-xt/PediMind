@@ -407,6 +407,7 @@ def render_monitor(disease_progress: int):
     else:
         hr, spo2, rr, status = 180, 82, 55, "critical"
 
+    # 报警颜色
     if status == "normal":
         hr_color = "#22ff88"
     elif status == "warn":
@@ -414,16 +415,19 @@ def render_monitor(disease_progress: int):
     else:
         hr_color = "#ff3b3b"
 
-    html_code = """
-<div style="width:100%; min-height:260px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
-    <canvas id="ecgCanvas" width="800" height="260" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
+    html_code = f"""
+<div style="width:100%; min-height:340px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
+    <canvas id="ecgCanvas" width="800" height="340" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
     <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
         <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
-        <div style="font-size:34px;font-weight:bold;color:HR_COLOR_PLACEHOLDER;text-shadow:0 0 10px HR_COLOR_PLACEHOLDER;">HR_VAL_PLACEHOLDER</div>
+        <div style="font-size:34px;font-weight:bold;color:{hr_color};text-shadow:0 0 10px {hr_color};">{hr}</div>
         <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
-        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">SPO_VAL_PLACEHOLDER</div>
+        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{spo2}</div>
         <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
-        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">RR_VAL_PLACEHOLDER</div>
+        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{rr}</div>
+    </div>
+    <div style="position:absolute; left:8px; top:8px; color:#39ff66; font-family:Courier New; font-size:13px; z-index:2;">
+        ECGⅡ<br>PLETH<br>RESP
     </div>
 </div>
 <script>
@@ -433,13 +437,16 @@ if(!canvas) return;
 const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
-const midY = H * 0.52;
-const amplitude = H * 0.32;
+const lineGap = H / 3;
 let offset = 0;
 const speed = 0.04;
+const HR = {hr};
+const RR = {rr};
 
-function getEcgVal(t) {
-    const p = (t % 1.0);
+// ECG QRS波形
+function getEcgVal(t) {{
+    const cycle = 60 / HR;
+    const p = (t % cycle) / cycle;
     let v = 0;
     if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
     if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
@@ -447,55 +454,85 @@ function getEcgVal(t) {
     if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
     if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
     return v;
-}
+}}
+// 血氧容积波
+function getPlethVal(t) {{
+    return 0.4 * Math.sin(2 * Math.PI * (HR/60) * t);
+}}
+// 呼吸波
+function getRespVal(t) {{
+    return 0.4 * Math.sin(2 * Math.PI * (RR/60) * t);
+}}
 
-function drawGrid() {
+function drawGrid() {{
     ctx.fillStyle="#000808";
     ctx.fillRect(0,0,W,H);
     ctx.strokeStyle="rgba(0,120,60,0.18)";
     ctx.lineWidth=0.5;
-    for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-    for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    for(let x=0;x<W;x+=24){{ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}}
+    for(let y=0;y<H;y+=24){{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
     ctx.strokeStyle="rgba(0,200,100,0.35)";
     ctx.lineWidth=0.8;
-    for(let x=0;x<W;x+=120){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-    for(let y=0;y<H;y+=120){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-}
+    for(let x=0;x<W;x+=120){{ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}}
+    for(let y=0;y<H;y+=120){{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
+}}
 
-function drawWave() {
+function drawWave() {{
+    // 通道1 ECG
     ctx.beginPath();
     ctx.strokeStyle="#22ff88";
     ctx.lineWidth=2.2;
     ctx.shadowColor="#22ff88";
-    ctx.shadowBlur=10;
-    ctx.lineJoin="round";
-    for(let x=0;x<W;x++){
+    ctx.shadowBlur=8;
+    const y0 = lineGap * 0.5;
+    for(let x=0;x<W;x++){{
         const t = (x * 0.0025) + offset;
         const val = getEcgVal(t);
-        const y = midY - val * amplitude;
-        if(x===0) ctx.moveTo(x,y);
-        else ctx.lineTo(x,y);
-    }
+        const y = y0 - val * lineGap * 0.35;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }}
+    ctx.stroke();
+
+    // 通道2 PLETH
+    ctx.beginPath();
+    ctx.strokeStyle="#22ff88";
+    ctx.lineWidth=1.8;
+    ctx.shadowBlur=6;
+    const y1 = lineGap * 1.5;
+    for(let x=0;x<W;x++){{
+        const t = (x * 0.0025) + offset;
+        const val = getPlethVal(t);
+        const y = y1 - val * lineGap * 0.35;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }}
+    ctx.stroke();
+
+    // 通道3 RESP
+    ctx.beginPath();
+    ctx.strokeStyle="#22ff88";
+    ctx.lineWidth=1.8;
+    ctx.shadowBlur=6;
+    const y2 = lineGap * 2.5;
+    for(let x=0;x<W;x++){{
+        const t = (x * 0.0025) + offset;
+        const val = getRespVal(t);
+        const y = y2 - val * lineGap * 0.35;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }}
     ctx.stroke();
     ctx.shadowBlur=0;
-}
+}}
 
-function render() {
+function render() {{
     drawGrid();
     drawWave();
     offset += speed;
-}
+}}
 render();
 window._ecgTimer = setInterval(render, 35);
 </script>
-    """
-    html_code = html_code.replace("HR_COLOR_PLACEHOLDER", hr_color)
-    html_code = html_code.replace("HR_VAL_PLACEHOLDER", str(hr))
-    html_code = html_code.replace("SPO_VAL_PLACEHOLDER", str(spo2))
-    html_code = html_code.replace("RR_VAL_PLACEHOLDER", str(rr))
-
-    components.html(html_code, height=280, scrolling=False)
-
+"""
+    components.html(html_code, height=360, scrolling=False)
 # ================= 新增：病情进度夹紧工具函数 =================
 def adjust_disease_progress(delta:int):
     ss = st.session_state
