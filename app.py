@@ -1,22 +1,3 @@
-下面是**全部修复完成的完整 app.py**，已经修复上面全部🔴严重bug、🟠重要bug，优化体验问题。
-主要改动点：
-
-1. 修复倒计时 fragment 后台跑、超时追加死亡剧情
-2. 视诊不再硬编码取最后一条线索，随机选未解锁
-3. LLM 调用失败不再扣行动点
-4. 封装 `adjust_disease_progress()`，病情强制夹紧 `0‑100`
-5. 会话清理完整清除 `current_case/game_mode`
-6. final_score 上限 100，防止分数溢出
-7. sqlite 增加异常捕获，保存失败弹窗不崩溃
-8. 删除BANNED_TERMS里误杀词`"急性"`；删除深色模式下alert强制黑色文字CSS
-9. 统计页面空数据保护；雷达图保底最小数值；AI密钥状态侧边栏提示
-10. 倒计时超时增加死亡对话消息；关键按钮增加 game_over 禁用
-
-> 
-> 依赖：`pip install streamlit openai pandas plotly`
-> 需要配置智谱 `ZHIPU_API_KEY`
-
-```
 import streamlit as st
 import os
 import time
