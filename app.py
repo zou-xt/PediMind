@@ -822,7 +822,6 @@ st.divider()
 if not st.session_state.game_over:
     tp = st.session_state.time_period
     ap = st.session_state.action_points
-
             # 第一幕 → 第二幕
             if tp == 1:
                 if ap <= 2:
