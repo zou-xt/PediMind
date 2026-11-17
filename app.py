@@ -238,6 +238,22 @@ def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
         except Exception:
             continue
     return None
+
+# =====================【成就展览馆路由，放在最前面！】=====================
+if st.session_state.screen == "achievement_gallery":
+    render_achievement_gallery_page()
+    st.stop()
+
+st.sidebar.markdown("### 🎨 主题设置")
+if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" else "🌙 夜晚模式"):
+    st.session_state.theme = "day" if st.session_state.theme == "night" else "night"; st.rerun()
+
+# 侧边栏新增成就展览馆按钮
+st.sidebar.markdown("---")
+if st.sidebar.button("🏅 成就展览馆"):
+    st.session_state.screen = "achievement_gallery"
+    st.rerun()
+
 # ================= 3. 成就系统【通用 + 分病例专属成就】 =================
 # 通用成就（所有病例都可以解锁）
 COMMON_ACHIEVEMENTS = {
@@ -693,37 +709,56 @@ else:
     </style>"""
 st.markdown(theme_css, unsafe_allow_html=True)
 
-# ===================== 【成就展览馆路由，放在最前面！】 =====================
-if st.session_state.screen == "achievement_gallery":
-    render_achievement_gallery_page()
-    st.stop()
-
-st.sidebar.markdown("### 🎨 主题设置")
-if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" else "🌙 夜晚模式"):
-    st.session_state.theme = "day" if st.session_state.theme == "night" else "night"; st.rerun()
-
-# 侧边栏新增成就展览馆按钮
-st.sidebar.markdown("---")
-if st.sidebar.button("🏅 成就展览馆"):
-    st.session_state.screen = "achievement_gallery"
-    st.rerun()
-
 # ================= 8. 界面渲染 =================
 # 屏幕 1：开始界面
+# ===================== 页面路由逻辑 =====================
 if st.session_state.screen == "start":
-    st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 80px; letter-spacing: 5px;">🏥 PediMind</div>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急诊风云</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div style="text-align: center; max-width: 600px; margin: 0 auto 50px auto; line-height: 2; font-size: 16px;">
-        <span style="color: #00b4d8; font-weight: bold;">欢迎来到 PediMind 儿科急诊模拟器。</span><br>
-        在这里，你是一名急诊科医生。<br>面对各种凶险的儿科急症，你的每一次决策，都将决定患儿的生死。
-    </div>
-    """, unsafe_allow_html=True)
+    # 【start 首页：昵称输入页，修复后的版本，无widget冲突】
+    st.markdown("# 🩺 PediMind · 急诊风云")
+    st.markdown("<br>", unsafe_allow_html=True)
     _, col_mid, _ = st.columns([1, 1, 1])
     with col_mid:
-        st.text_input("👨‍⚕️ 你的昵称（用于记录错题本，输入相同昵称可查看历史）",
-                      key="player_name", max_chars=12)
+        name_input = st.text_input(
+            "👨‍⚕️ 你的昵称（用于记录错题本，输入相同昵称可查看历史）",
+            max_chars=12
+        )
         if st.button("🚀 开始游戏", use_container_width=True, type="primary"):
-            st.session_state.player_name = st.session_state.player_name
-            st.session_state.screen = "select_case"
+            if name_input.strip() == "":
+                st.warning("请输入昵称！")
+            else:
+                st.session_state.player_name = name_input.strip()
+                st.session_state.screen = "select_case"
+                st.rerun()
+
+elif st.session_state.screen == "select_case":
+    # 病例选择页
+    st.markdown(f"## 欢迎你，{st.session_state.player_name}！")
+    st.markdown("### 📋 请选择一个病例开始答题")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    case_list = [
+        "病例1：急性阑尾炎",
+        "病例2：社区获得性肺炎",
+        "病例3：急性心梗",
+        "病例4：糖尿病酮症酸中毒"
+    ]
+    selected_case = st.radio("选择病例：", case_list)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ 进入病例", use_container_width=True, type="primary"):
+            st.session_state.current_case = selected_case
+            st.session_state.screen = "quiz"
             st.rerun()
+    with col2:
+        if st.button("🔙 返回首页", use_container_width=True):
+            st.session_state.screen = "start"
+            st.rerun()
+
+elif st.session_state.screen == "quiz":
+    # 答题页面占位
+    st.markdown(f"## 📖 {st.session_state.current_case}")
+    st.info("这里是答题页面，后续可以写题干、选项、判分逻辑")
+    if st.button("🔙 返回病例选择"):
+        st.session_state.screen = "select_case"
+        st.rerun()
