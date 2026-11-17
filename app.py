@@ -396,96 +396,127 @@ def render_message(role: str, content: str):
         </div>""", unsafe_allow_html=True)
 
 # ================= 6. 专业四通道重症监护仪 =================
-def render_monitor(disease_progress: int):
+@st.fragment
+def render_monitor(disease_progress:int):
+    # 根据病情度计算生命体征数值
     if disease_progress < 40:
-        hr, spo2, rr, sys, dia, status = 120, 97, 28, 100, 60, "normal"
+        hr, spo2, rr, sys, dia = 120, 97, 28, 100, 60
     elif disease_progress < 70:
-        hr, spo2, rr, sys, dia, status = 140, 93, 35, 90, 50, "warn"
+        hr, spo2, rr, sys, dia = 140, 93, 35, 90, 50
     elif disease_progress < 90:
-        hr, spo2, rr, sys, dia, status = 160, 88, 45, 80, 40, "danger"
+        hr, spo2, rr, sys, dia = 160, 88, 45, 80, 40
     else:
-        hr, spo2, rr, sys, dia, status = 180, 82, 55, 70, 30, "critical"
+        hr, spo2, rr, sys, dia = 180, 82, 55, 70, 30
+
+    # 参数传递给前端JS
     html_code = f"""
     <!DOCTYPE html><html><head><style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{ background:#000; overflow:hidden; font-family: 'Courier New', monospace; }}
-      .monitor {{ display: flex; width:100%; height:240px; background:#000; border-radius:8px; border:1px solid #333; overflow:hidden; }}
+      .monitor {{ display: flex; width:100%; height:260px; background:#000; border-radius:8px; border:1px solid #333; overflow:hidden; }}
       .canvas-container {{ flex: 1; position: relative; background:#000; }}
       canvas {{ display: block; width: 100%; height: 100%; }}
-      .vitals-panel {{ width: 120px; display: flex; flex-direction: column; justify-content: space-around; background: #050505; padding-right: 12px; border-left: 1px solid #1a1a1a; }}
+      .vitals-panel {{ width: 130px; display: flex; flex-direction: column; justify-content: space-around; background: #050505; padding-right: 10px; border-left: 1px solid #1a1a1a; }}
       .vital-row {{ display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }}
       .vital-top {{ display: flex; align-items: flex-end; gap: 4px; }}
       .v-label {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; }}
-      .v-num {{ font-size: 32px; font-weight: bold; letter-spacing: -1px; }}
-      .v-unit {{ font-size: 10px; color: #555; margin-top: 2px; }}
+      .v-num {{ font-size: 30px; font-weight: bold; letter-spacing: -1px; }}
+      .v-unit {{ font-size: 10px; color:#666; margin-top:2px; }}
       .blink {{ animation: blink 0.6s infinite; }}
-      @keyframes blink {{ 50% {{ opacity: 0.3; }} }}
+      @keyframes blink {{ 50% {{ opacity:0.3; }} }}
     </style></head><body>
       <div class="monitor">
         <div class="canvas-container"><canvas id="wave-canvas"></canvas></div>
         <div class="vitals-panel">
-            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#00ff00">HR</div><div class="v-num" style="color:#00ff00" id="v-hr">--</div></div><div class="v-unit">bpm</div></div>
-            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ff3333">ABP</div><div class="v-num" style="color:#ff3333; font-size: 24px;" id="v-abp">--/--</div></div><div class="v-unit">mmHg</div></div>
-            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ffff00">SpO₂</div><div class="v-num" style="color:#ffff00" id="v-spo2">--</div></div><div class="v-unit">%</div></div>
-            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ffffff">RESP</div><div class="v-num" style="color:#ffffff" id="v-rr">--</div></div><div class="v-unit">/min</div></div>
+            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#00ff00">HR</div><div class="v-num" style="color:#00ff00" id="v-hr">{hr}</div></div><div class="v-unit">bpm</div></div>
+            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ff3333">ABP</div><div class="v-num" style="color:#ff3333; font-size: 22px;" id="v-abp">{sys}/{dia}</div></div><div class="v-unit">mmHg</div></div>
+            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ffff00">SpO₂</div><div class="v-num" style="color:#ffff00" id="v-spo2">{spo2}</div></div><div class="v-unit">%</div></div>
+            <div class="vital-row"><div class="vital-top"><div class="v-label" style="color:#ffffff">RESP</div><div class="v-num" style="color:#ffffff" id="v-rr">{rr}</div></div><div class="v-unit">/min</div></div>
         </div>
       </div>
     <script>
-        const HR={hr}, SPO2={spo2}, RR={rr}, SYS={sys}, DIA={dia}, STATUS="{status}";
+        // Python后端传入实时生命体征
+        const HR={hr}, SPO2={spo2}, RR={rr}, SYS={sys}, DIA={dia};
         const canvas = document.getElementById('wave-canvas');
         const ctx = canvas.getContext('2d');
-        let W, H, pxPerSec = 120;
-        let t = 0, lastTime = performance.now();
+        let W, H;
+        // 根据心率动态调整走纸速度、波形振幅
+        const baseSpeed = HR * 2.2;
+        const ecgAmp = 0.25 + HR / 600;
+        const abpAmp = 0.22 + HR / 650;
+
         function resize() {{
             const r = canvas.parentElement.getBoundingClientRect();
-            canvas.width = r.width * devicePixelRatio; canvas.height = r.height * devicePixelRatio;
+            canvas.width = r.width * devicePixelRatio;
+            canvas.height = r.height * devicePixelRatio;
             ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-            W = r.width; H = r.height; pxPerSec = W / 2.5;
+            W = r.width;
+            H = r.height;
         }}
-        window.addEventListener('resize', resize); resize();
-        function getECG(p) {{ if(p<0)p+=1; let v = 0.1*Math.exp(-Math.pow((p-0.15)/0.02,2)) - 0.2*Math.exp(-Math.pow((p-0.24)/0.008,2)) + 1.0*Math.exp(-Math.pow((p-0.25)/0.010,2)) - 0.3*Math.exp(-Math.pow((p-0.27)/0.010,2)) + 0.25*Math.exp(-Math.pow((p-0.4)/0.04,2)); return v; }}
-        function getABP(p) {{ if(p<0)p+=1; let v = 1.0*Math.exp(-Math.pow((p-0.15)/0.03,2)) + 0.4*Math.exp(-Math.pow((p-0.4)/0.15,2)) + 0.1*Math.exp(-Math.pow((p-0.6)/0.05,2)); return Math.max(0,v); }}
-        function getSpO2(p) {{ if(p<0)p+=1; return Math.max(0, Math.sin(p*Math.PI*2) + 0.2*Math.sin(p*Math.PI*4)); }}
-        function getResp(p) {{ if(p<0)p+=1; return Math.sin(p*Math.PI*2); }}
-        function drawChannel(yBase, yHeight, dataFunc, phaseMult, color, lineWidth) {{
-            ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.lineJoin = 'round';
-            for (let x = 0; x < W; x++) {{
-                let timeAgo = (W - x) / pxPerSec;
-                let phase = ((t - timeAgo) * phaseMult) % 1;
-                let val = dataFunc(phase);
-                let y = yBase - val * yHeight;
-                if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        window.addEventListener('resize', resize);
+        resize();
+
+        // QRS心电波形
+        function getECG(phase) {{
+            let t = phase % 1.0;
+            let v = 0;
+            if(t>0.12 && t<0.18) v = ecgAmp * 1.0;
+            else if(t>0.18 && t<0.22) v = ecgAmp * -0.25;
+            else if(t>0.22 && t<0.29) v = ecgAmp * 1.35;
+            return v;
+        }}
+        // 动脉血压波形
+        function getABP(phase){{
+            let t = phase %1.0;
+            return abpAmp * Math.sin(t*Math.PI*2.1);
+        }}
+
+        let offset = 0;
+        function draw(){{
+            ctx.fillStyle="#000";
+            ctx.fillRect(0,0,W,H);
+            // 网格线
+            ctx.strokeStyle="rgba(40,80,40,0.25)";
+            ctx.lineWidth=1;
+            for(let y=0;y<H;y+=40){{ ctx.beginPath(); ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }}
+
+            // 绘制ECG绿色
+            ctx.beginPath();
+            ctx.strokeStyle="#00ff00";
+            ctx.lineWidth=1.6;
+            for(let x=0;x<W;x++){{
+                let phase = (x + offset) / baseSpeed;
+                let val = getECG(phase);
+                let yy = H/2 - val * 90;
+                if(x===0) ctx.moveTo(x,yy);
+                else ctx.lineTo(x,yy);
             }}
             ctx.stroke();
+
+            // 绘制ABP红色
+            ctx.beginPath();
+            ctx.strokeStyle="#ff3333";
+            ctx.lineWidth=1.6;
+            for(let x=0;x<W;x++){{
+                let phase = (x + offset) / baseSpeed;
+                let val = getABP(phase);
+                let yy = H*0.72 - val*80;
+                if(x===0) ctx.moveTo(x,yy);
+                else ctx.lineTo(x,yy);
+            }}
+            ctx.stroke();
+
+            offset += 1.1;
+            if(offset> W) offset = 0;
         }}
-        function draw() {{
-            ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-            const chHeight = H / 4;
-            ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
-            for(let i=1; i<4; i++) {{ ctx.beginPath(); ctx.moveTo(0, chHeight*i); ctx.lineTo(W, chHeight*i); ctx.stroke(); }}
-            let hrMult = HR / 60; let rrMult = RR / 60;
-            drawChannel(chHeight*0.75, chHeight*0.5, getECG, hrMult, "#00ff00", 1.5);
-            drawChannel(chHeight*1.85, chHeight*0.5, getABP, hrMult, "#ff3333", 1.5);
-            drawChannel(chHeight*2.85, chHeight*0.5, getSpO2, hrMult, "#ffff00", 1.5);
-            drawChannel(chHeight*3.65, chHeight*0.4, getResp, rrMult, "#ffffff", 1.5);
+        function loop(){{
+            draw();
+            requestAnimationFrame(loop);
         }}
-        function loop(now) {{
-            let dt = (now - lastTime) / 1000; lastTime = now;
-            if (dt > 0.1) dt = 0.1; t += dt; draw(); requestAnimationFrame(loop);
-        }}
-        function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
-        function updateVitals() {{
-            let hrEl = document.getElementById('v-hr');
-            hrEl.textContent = jit(HR, 4);
-            document.getElementById('v-abp').textContent = jit(SYS, 3) + "/" + jit(DIA, 2);
-            document.getElementById('v-spo2').textContent = jit(SPO2, 1);
-            document.getElementById('v-rr').textContent = jit(RR, 2);
-            if (STATUS === "critical" || STATUS === "danger") hrEl.classList.add('blink'); else hrEl.classList.remove('blink');
-        }}
-        updateVitals(); setInterval(updateVitals, 1500); requestAnimationFrame(loop);
+        loop();
     </script></body></html>
     """
-    components.html(html_code, height=260, scrolling=False)
+    components.html(html_code, height=280, scrolling=False)
 
 # ================= 新增：病情进度夹紧工具函数 =================
 def adjust_disease_progress(delta:int):
