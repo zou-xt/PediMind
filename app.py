@@ -397,6 +397,7 @@ def render_message(role: str, content: str):
 
 # ================= 6. 优化版心电监护仪 =================
 def render_monitor(disease_progress: int):
+    # 病情映射生命体征
     if disease_progress < 40:
         hr, spo2, rr, status = 120, 97, 28, "normal"
     elif disease_progress < 70:
@@ -407,128 +408,101 @@ def render_monitor(disease_progress: int):
         hr, spo2, rr, status = 180, 82, 55, "critical"
 
     html_code = f"""
-    <!DOCTYPE html><html><head><style>
-      * {{ margin:0; padding:0; box-sizing:border-box; }}
-      body {{ background:#02060a; overflow:hidden; }}
-      .monitor {{ position:relative; width:100%; height:180px; background:#02060a;
-                 border-radius:10px; border:1px solid #0a3a2a; overflow:hidden; }}
-      canvas {{ display:block; width:100%; height:100%; }}
-      
-      /* 背景加深，防止波形穿字 */
-      .vitals {{ position:absolute; top:8px; right:12px; text-align:right;
-                font-family:'Courier New',monospace;
-                background: rgba(0, 0, 0, 0.65); 
-                padding: 8px 12px; border-radius: 8px; 
-                backdrop-filter: blur(4px); z-index: 10; }}
-      .vital-item {{ margin-bottom:4px; line-height:1.1; text-shadow:0 0 6px currentColor; }}
-      .vital-label {{ font-size:10px; opacity:0.85; letter-spacing:1px; }}
-      .vital-value {{ font-size:24px; font-weight:bold; }}
-      .vital-unit  {{ font-size:10px; opacity:0.65; }}
-      
-      .c-green {{ color:#22ff88; }} .c-yellow {{ color:#ffcc00; }} .c-red {{ color:#ff3b3b; }}
-      .blink {{ animation:blink 0.6s infinite; }}
-      @keyframes blink {{ 50% {{ opacity:0.25; }} }}
-    </style></head><body>
-      <div class="monitor">
-        <canvas id="ecg"></canvas>
-        <div class="vitals">
-          <div class="vital-item"><div class="vital-label">HR</div><div id="hr" class="vital-value">--</div><div class="vital-unit">bpm</div></div>
-          <div class="vital-item"><div class="vital-label">SpO₂</div><div id="spo2" class="vital-value">--</div><div class="vital-unit">%</div></div>
-          <div class="vital-item"><div class="vital-label">RR</div><div id="rr" class="vital-value">--</div><div class="vital-unit">/min</div></div>
+    <div style="position:relative;width:100%;height:200px;background:#000505;border-radius:8px;overflow:hidden;">
+        <canvas id="ecgRealCanvas"></canvas>
+        <div style="position:absolute;top:8px;right:10px;font-family:'Courier New',monospace;background:rgba(0,0,0,0.65);padding:6px 10px;border-radius:6px;z-index:2;">
+            <div style="font-size:10px;opacity:0.8;">HR</div>
+            <div id="dispHR" style="font-size:24px;font-weight:bold;color:{'#22ff88' if status=='normal' else '#ffcc00' if status=='warn' else '#ff3b3b'};">{hr}</div>
+            <div style="font-size:10px;opacity:0.8;margin-top:4px;">SpO₂</div>
+            <div id="dispSP" style="font-size:24px;font-weight:bold;color:#22ff88;">{spo2}</div>
+            <div style="font-size:10px;opacity:0.8;margin-top:4px;">RR</div>
+            <div id="dispRR" style="font-size:24px;font-weight:bold;color:#22ff88;">{rr}</div>
         </div>
-      </div>
+    </div>
     <script>
-      const HR={hr}, SPO2={spo2}, RR={rr}, STATUS="{status}";
-      const color = (STATUS==="critical"||STATUS==="danger") ? "#ff3b3b"
-                  : STATUS==="warn" ? "#ffcc00" : "#22ff88";
-      const canvas = document.getElementById('ecg');
-      const ctx = canvas.getContext('2d');
-      let W, H;
-      function resize() {{
-        const r = canvas.parentElement.getBoundingClientRect();
-        canvas.width = r.width * devicePixelRatio;
-        canvas.height = r.height * devicePixelRatio;
-        ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-        W = r.width; H = r.height;
-      }}
-      window.addEventListener('resize', resize); resize();
+    // 销毁上一次定时器，解决多重实例叠加重影
+    if(window._ecgRealTimer) {{ clearInterval(window._ecgRealTimer); }}
+    const canvas = document.getElementById("ecgRealCanvas");
+    if(!canvas){{}} else {{
+        const ctx = canvas.getContext('2d');
+        const pixelRatio = window.devicePixelRatio || 1;
+        const domW = canvas.offsetWidth;
+        const domH = canvas.offsetHeight;
+        canvas.width = domW * pixelRatio;
+        canvas.height = domH * pixelRatio;
+        ctx.scale(pixelRatio, pixelRatio);
 
-      // 真实感ECG波形
-      function ecgSample(p) {{
-        let v = 0;
-        v += 0.12 * Math.exp(-Math.pow((p-0.15)/0.015, 2)); 
-        v -= 0.15 * Math.exp(-Math.pow((p-0.24)/0.005, 2)); 
-        v += 1.15 * Math.exp(-Math.pow((p-0.25)/0.006, 2)); 
-        v -= 0.25 * Math.exp(-Math.pow((p-0.265)/0.008, 2)); 
-        v += 0.25 * Math.exp(-Math.pow((p-0.4)/0.03, 2));   
-        return v;
-      }}
+        const W = domW;
+        const H = domH;
+        const midY = H * 0.5;
 
-      const BUFFER = 400;
-      const data = new Array(BUFFER).fill(0);
-      let phase = 0;
-      const cycleDur = 60 / HR;
-      let lastTime = performance.now();
+        // 走纸速度 mm/s，心率越高走纸越快
+        const paperSpeed = hr / 25.0;
+        const bufSize = Math.floor(W * 1.3);
+        // 波形缓冲区，存储整条滚动波形
+        const ecgBuffer = new Array(bufSize).fill(0);
+        let ptr = 0;
 
-      function drawGrid() {{
-        ctx.lineWidth = 0.5;
-        ctx.strokeStyle = "rgba(0,255,128,0.06)";
-        for (let x=0; x<W; x+=8) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
-        for (let y=0; y<H; y+=8) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
-        ctx.strokeStyle = "rgba(0,255,128,0.12)";
-        for (let x=0; x<W; x+=40) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
-        for (let y=0; y<H; y+=40) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
-      }}
-
-      function drawWave() {{
-        const step = W / BUFFER, midY = H * 0.62, amp = H * 0.42;
-        ctx.beginPath();
-        ctx.strokeStyle = color; 
-        ctx.lineWidth = 1.5;
-        ctx.lineJoin = 'round';
-        for (let i=0; i<BUFFER; i++) {{
-          const x = i*step, y = midY - data[i]*amp;
-          i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-        }}
-        ctx.stroke(); 
-      }}
-
-      function loop(now) {{
-        let dt = (now - lastTime) / 1000;
-        lastTime = now;
-        if (dt > 0.1) dt = 0.1; 
-
-        const sampleRate = 60; 
-        const perFrame = Math.max(1, Math.floor(dt * sampleRate));
-        const dPhase = (dt / cycleDur);
-
-        for (let k=0; k<perFrame; k++) {{
-          phase = (phase + dPhase / perFrame) % 1;
-          let v = ecgSample(phase);
-          if (STATUS==="danger"||STATUS==="critical") {{
-              v += (Math.random()-0.5)*0.05;
-          }}
-          data.push(v); data.shift();
+        // 真实P‑QRS‑T心电波形
+        function genECGPhase(phase) {{
+            let p = phase % 1.0;
+            let val = 0.0;
+            // P波
+            if(p>0.02 && p<0.12) val += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
+            // Q波
+            if(p>0.14 && p<0.18) val -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
+            // R波 高大主峰
+            if(p>0.18 && p<0.23) val += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
+            // S波
+            if(p>0.23 && p<0.28) val -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
+            // T波
+            if(p>0.32 && p<0.55) val += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
+            return val;
         }}
 
-        ctx.clearRect(0,0,W,H);
-        drawGrid(); drawWave();
-        requestAnimationFrame(loop);
-      }}
-      requestAnimationFrame(loop);
+        let ph = 0.0;
+        const beatPeriod = 60.0 / hr;
 
-      function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
-      function updateVitals() {{
-        const cls = (STATUS==="critical"||STATUS==="danger") ? "vital-value c-red blink"
-                  : STATUS==="warn" ? "vital-value c-yellow" : "vital-value c-green";
-        const hrEl=document.getElementById('hr'), spEl=document.getElementById('spo2'), rrEl=document.getElementById('rr');
-        hrEl.textContent = jit(HR,4); spEl.textContent = jit(SPO2,1); rrEl.textContent = jit(RR,1);
-        [hrEl,spEl,rrEl].forEach(e=>e.className=cls);
-      }}
-      updateVitals(); setInterval(updateVitals, 1200);
-    </script></body></html>
+        function drawGrid(){{
+            ctx.fillStyle="#000505";
+            ctx.fillRect(0,0,W,H);
+            // 监护仪标准小方格
+            ctx.strokeStyle="rgba(0,100,60,0.15)";
+            ctx.lineWidth=0.5;
+            for(let x=0;x<W;x+=8){{ ctx.beginPath(); ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }}
+            for(let y=0;y<H;y+=8){{ ctx.beginPath(); ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }}
+            ctx.strokeStyle="rgba(0,180,100,0.35)";
+            for(let x=0;x<W;x+=40){{ ctx.beginPath(); ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }}
+            for(let y=0;y<H;y+=40){{ ctx.beginPath(); ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }}
+        }}
+
+        function redraw(){{
+            drawGrid();
+            ctx.beginPath();
+            ctx.strokeStyle="#22ff88";
+            ctx.lineWidth=1.8;
+            ctx.lineJoin="round";
+            for(let i=0;i<W;i++){{
+                const idx = (ptr + i) % bufSize;
+                const y = midY - ecgBuffer[idx] * H * 0.32;
+                if(i===0) ctx.moveTo(i,y);
+                else ctx.lineTo(i,y);
+            }}
+            ctx.stroke();
+        }}
+
+        function tick(){{
+            ph += 0.022 / beatPeriod;
+            const sample = genECGPhase(ph % 1.0);
+            ecgBuffer[ptr] = sample;
+            ptr = (ptr + 1) % bufSize;
+            redraw();
+        }}
+        window._ecgRealTimer = setInterval(tick, 32);
+    }}
+    </script>
     """
-    components.html(html_code, height=190, scrolling=False)
+    components.html(html_code, height=210, scrolling=False)
 
 # ================= 新增：病情进度夹紧工具函数 =================
 def adjust_disease_progress(delta:int):
