@@ -406,21 +406,26 @@ def render_monitor(disease_progress: int):
     else:
         hr, spo2, rr, status = 180, 82, 55, "critical"
 
-    hr_color = "#22ff88" if status == "normal" else "#ffcc00" if status == "warn" else "#ff3b3b"
+    if status == "normal":
+        hr_color = "#22ff88"
+    elif status == "warn":
+        hr_color = "#ffcc00"
+    else:
+        hr_color = "#ff3b3b"
 
-    html_code = f"""
+    html_code = """
     <div style="width:100%; height:260px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
         <canvas id="ecgCanvas" width="800" height="260" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
 
         <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
-            <div style="font-size:34px;font-weight:bold;color:{hr_color};text-shadow:0 0 10px {hr_color};">{hr}</div>
+            <div style="font-size:34px;font-weight:bold;color:HR_COLOR_PLACEHOLDER;text-shadow:0 0 10px HR_COLOR_PLACEHOLDER;">HR_VAL_PLACEHOLDER</div>
 
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
-            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{spo2}</div>
+            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">SPO_VAL_PLACEHOLDER</div>
 
             <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
-            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{rr}</div>
+            <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">RR_VAL_PLACEHOLDER</div>
         </div>
     </div>
 
@@ -437,19 +442,13 @@ def render_monitor(disease_progress: int):
     let offset = 0;
     const speed = 0.04;
 
-    // 标准P-QRS-T心电波形
     function getEcgVal(t) {
         const p = (t % 1.0);
         let v = 0;
-        // P波
         if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
-        // Q波
         if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
-        // R波
         if(p>0.18 && p<0.23) v += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
-        // S波
         if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
-        // T波
         if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
         return v;
     }
@@ -457,12 +456,10 @@ def render_monitor(disease_progress: int):
     function drawGrid() {
         ctx.fillStyle="#000808";
         ctx.fillRect(0,0,W,H);
-        // 小格子
         ctx.strokeStyle="rgba(0,120,60,0.18)";
         ctx.lineWidth=0.5;
         for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
         for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-        // 粗格子
         ctx.strokeStyle="rgba(0,200,100,0.35)";
         ctx.lineWidth=0.8;
         for(let x=0;x<W;x+=120){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
@@ -496,6 +493,12 @@ def render_monitor(disease_progress: int):
     window._ecgTimer = setInterval(render, 35);
     </script>
     """
+    # 替换占位符
+    html_code = html_code.replace("HR_COLOR_PLACEHOLDER", hr_color)
+    html_code = html_code.replace("HR_VAL_PLACEHOLDER", str(hr))
+    html_code = html_code.replace("SPO_VAL_PLACEHOLDER", str(spo2))
+    html_code = html_code.replace("RR_VAL_PLACEHOLDER", str(rr))
+
     st.components.v1.html(html_code, height=270, scrolling=False)
 
 # ================= 新增：病情进度夹紧工具函数 =================
