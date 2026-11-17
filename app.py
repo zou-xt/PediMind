@@ -803,7 +803,7 @@ if st.session_state.screen == "game":
     col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
 
     # ---------------- 左侧 ----------------
-    with col_left:
+with col_left:
     st.subheader("📈 生命体征")
     dp = st.session_state.disease_progress
     render_monitor(dp)
