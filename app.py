@@ -724,3 +724,6 @@ if st.session_state.screen == "start":
         st.text_input("👨‍⚕️ 你的昵称（用于记录错题本，输入相同昵称可查看历史）",
                       key="player_name", max_chars=12)
         if st.button("🚀 开始游戏", use_container_width=True, type="primary"):
+            st.session_state.player_name = st.session_state.player_name
+            st.session_state.screen = "select_case"
+            st.rerun()
