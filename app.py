@@ -839,9 +839,9 @@ if not st.session_state.game_over:
             st.session_state.time_period = 4
             st.session_state.action_points = 3
             adjust_disease_progress(15)
-                    st.session_state.crisis_start_time = time.time()
-                    st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重）医生！救救她！"})
-                    st.rerun()
+            st.session_state.crisis_start_time = time.time()
+            st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重）医生！救救她！"})
+            st.rerun()
 
             # 第四幕 → 第五幕
             if tp == 4 and st.session_state.crisis_correct_count >= 2:
