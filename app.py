@@ -25,7 +25,7 @@ try:
     API_KEY = st.secrets["ZHIPU_API_KEY"]
 except Exception:
     API_KEY = "sk-你的真实智谱AI密钥"  # 替换为你的Key
-BASE_URL = "[https://open.bigmodel.cn/api/paas/v4/](https://open.bigmodel.cn/api/paas/v4/)"
+BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
@@ -119,7 +119,6 @@ CLUE_SYNONYMS = {
     "深大呼吸":       ["喘气特别大", "呼吸很大声", "大喘气"],
     "精神萎靡":       ["叫不醒", "没精神", "软绵绵"],
 }
-# 删除"急性"防止误杀普通语句
 BANNED_TERMS = [
     "喉炎", "会厌", "哮喘", "异物", "支气管", "诊断", "确诊",
     "惊厥", "癫痫", "肠套叠", "休克", "酮症", "酸中毒", "糖尿病", "脑膜炎",
@@ -159,8 +158,10 @@ FALLBACK_REPLIES = {
     "default":      "医生，我真的好担心，求您快帮帮孩子吧！",
 }
 
+
 def _ai_available() -> bool:
     return bool(API_KEY) and "你的" not in str(API_KEY) and len(str(API_KEY)) > 20
+
 
 def match_clues(prompt: str, case: dict) -> list:
     text = prompt.lower()
@@ -170,6 +171,7 @@ def match_clues(prompt: str, case: dict) -> list:
         if any(s.lower() in text for s in synonyms):
             hits.append(clue)
     return hits
+
 
 def sanitize_reply(reply):
     if not isinstance(reply, str):
@@ -181,11 +183,13 @@ def sanitize_reply(reply):
         return None
     return reply
 
+
 def pick_fallback(hit_clues: list) -> str:
     for c in hit_clues:
         if c in FALLBACK_REPLIES:
             return FALLBACK_REPLIES[c]
     return FALLBACK_REPLIES["default"]
+
 
 def build_mom_system(case_id: str, case: dict) -> str:
     facts = MOM_FACTS.get(case_id, [])
@@ -201,6 +205,7 @@ def build_mom_system(case_id: str, case: dict) -> str:
 4. 医生问到你不知道的，就说"这我也不懂啊医生"。
 5. 只输出 JSON：{{"reply": "你的回答"}}，不要输出其他任何内容。"""
 
+
 def _clean_history(history: list) -> list:
     out = []
     for m in history:
@@ -208,6 +213,7 @@ def _clean_history(history: list) -> list:
         if c:
             out.append({"role": "user" if m.get("role") == "user" else "assistant", "content": c})
     return out
+
 
 def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
     if not _ai_available():
@@ -233,14 +239,16 @@ ACHIEVEMENTS = {
     "first_inquiry": {"icon": "🩺", "name": "初次问诊", "desc": "迈出问诊第一步"},
     "all_clues":     {"icon": "🔍", "name": "明察秋毫", "desc": "集齐全部线索"},
     "correct_dx":    {"icon": "🎯", "name": "一针见血", "desc": "初步诊断完全正确"},
-    "lifesaver":     {"icon": "⚡", "name": "妙手回春", "desc": "急救处置正确 ≥2 次"},
+    "lifesaver":     {"icon": "⚡", "name": "妙手回春", "desc": "急救处置正确 ≥2 次，未呼叫上级支援"},
     "empathy":       {"icon": "💬", "name": "医者仁心", "desc": "用共情方式交代病情"},
-    "perfect":       {"icon": "🏆", "name": "急诊之光", "desc": "最终得分 ≥ 80"},
+    "perfect":       {"icon": "🏆", "name": "急诊之光", "desc": "最终得分 ≥ 80，未呼叫上级支援"},
 }
+
 
 def unlock_achievement(aid):
     if aid not in st.session_state.achievements:
         st.session_state.achievements.append(aid)
+
 
 def check_achievements(case):
     ss = st.session_state
@@ -250,12 +258,13 @@ def check_achievements(case):
         unlock_achievement("all_clues")
     if ss.diagnosis_made and case["diagnosis"].get(ss.diagnosis_made) == case["disease"]:
         unlock_achievement("correct_dx")
-    if ss.crisis_correct_count >= 2:
+    if ss.crisis_correct_count >= 2 and not ss.get("call_support_used", False):
         unlock_achievement("lifesaver")
     if ss.score_empathy > 0:
         unlock_achievement("empathy")
-    if ss.final_score >= 80:
+    if ss.final_score >= 80 and not ss.get("call_support_used", False):
         unlock_achievement("perfect")
+
 
 def render_achievements(container=st.sidebar):
     container.markdown("### 🏅 成就墙")
@@ -277,6 +286,7 @@ def render_achievements(container=st.sidebar):
 # ================= 4. 数据持久化层 =================
 DB_PATH = "pedimind_records.db"
 
+
 @contextmanager
 def db():
     conn = sqlite3.connect(DB_PATH, timeout=10)
@@ -286,6 +296,7 @@ def db():
         conn.commit()
     finally:
         conn.close()
+
 
 def init_db():
     with db() as c:
@@ -300,7 +311,9 @@ def init_db():
             mistakes TEXT, achievements TEXT, created_at TEXT
         )""")
 
+
 init_db()
+
 
 def save_record(rec: dict):
     try:
@@ -318,11 +331,13 @@ def save_record(rec: dict):
     except Exception as e:
         st.warning(f"⚠️本局记录保存失败：{str(e)}")
 
+
 def fetch_my_records(player_name: str):
     with db() as c:
         c.row_factory = sqlite3.Row
         rows = c.execute("SELECT * FROM records WHERE player_name=? ORDER BY id DESC", (player_name,)).fetchall()
     return [dict(r) for r in rows]
+
 
 def fetch_all_records():
     with db() as c:
@@ -340,6 +355,7 @@ def load_avatar(path: str) -> str:
     with open(path, "rb") as f:
         b64 = base64.encodebytes(f.read()).decode()
     return f"data:image/{mime};base64,{b64}"
+
 
 def render_message(role: str, content: str):
     safe = html.escape(str(content)).replace("\n", "<br>")
@@ -712,7 +728,6 @@ def crisis_countdown():
         ss.game_over = True
         st.rerun()
     st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！")
-
 # ================= 12. 游戏主逻辑 =================
 if st.session_state.screen == "game":
     case = CASES_CONFIG[st.session_state.current_case]
@@ -729,7 +744,8 @@ if st.session_state.screen == "game":
         "physical_exam_done": {}, "achievements": st.session_state.get("achievements", []),
         "first_act_clue": False, "excluded_diseases": [],
         "comm_made": False, "last_action_time": time.time(), "crisis_start_time": time.time(),
-        "record_saved": False, "intro_video_played": False
+        "record_saved": False, "intro_video_played": False,
+        "call_support_used": False  # 本局是否呼叫过上级支援（最多1次）
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -765,7 +781,12 @@ if st.session_state.screen == "game":
             st.rerun()
         st.session_state.intro_video_played = True
 
-    st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
+    st.markdown(f'''
+<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;">
+<div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div>
+<div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div>
+<div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div>
+</div>''', unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1.1, 2.5, 1.2])
     with col_left:
@@ -865,236 +886,15 @@ if st.session_state.screen == "game":
             tp_now = st.session_state.time_period
 
             if tp_now == 1:
-                st.markdown(f"""
-                <div style="background: rgba(0, 180, 216, 0.1); border-left: 4px solid #00b4d8;
-                            padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="font-size: 15px; font-weight: bold; color: #00b4d8; margin-bottom: 5px;">🚑 前情提要</div>
-                    <div style="font-size: 14px; color: #e2e8f0; line-height: 1.6;">
-                        <b>患儿：</b>{case['patient']} <br>
-                        <b>场景：</b>{case['description']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                st.caption("💡 任务：安抚情绪，通过问诊了解发病时间和特征。")
-            elif tp_now == 2:
-                st.info("💡 任务：综合已有线索，做出初步诊断。")
-            elif tp_now == 3:
-                st.info("💡 任务：继续收集线索，随时准备迎接突发状况。")
-        else:
-            st.title("🏥 结案复盘")
-
-        if st.session_state.time_period == 2 and not st.session_state.game_over:
-            st.markdown("#### 🩺 初步诊断")
-            if not st.session_state.diagnosis_processed:
-                st.write("根据目前的线索，你认为最可能的诊断是：")
-                for opt_key, opt_val in case["diagnosis"].items():
-                    if st.button(opt_val, key=f"diag_{opt_key}", use_container_width=True, disabled=st.session_state.game_over):
-                        st.session_state.diagnosis_processed = True
-                        st.session_state.diagnosis_made = opt_key
-                        if opt_val == case["disease"]:
-                            st.session_state.score_diagnosis += 15
-                            st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！这是{case['disease']}。"})
-                        else:
-                            adjust_disease_progress(25)
-                            st.session_state.penalty_log.append(f"误诊为{opt_val}")
-                            st.session_state.messages.append({"role": "assistant", "content": "❌ 误诊！病情加重。"})
-                            if st.session_state.disease_progress >= 100:
-                                st.session_state.game_over = True
-                        st.rerun()
-            else:
-                st.success("✅ 初步诊断已记录。")
-                if st.button("▶️ 进入第三幕：迷雾重重", use_container_width=True, type="primary", disabled=st.session_state.game_over):
-                    st.session_state.time_period = 3
-                    st.session_state.action_points = 5
-                    adjust_disease_progress(10)
-                    st.rerun()
-            with st.container(height=300):
-                for msg in st.session_state.messages:
-                    render_message(msg["role"], msg["content"])
-        else:
-            if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
-                with st.expander("🩺 体格检查工具箱（消耗行动点）", expanded=False):
-                    tab1, tab2, tab3 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊/叩诊"])
-                    with tab1:
-                        if st.button("观察呼吸/查体", disabled=st.session_state.game_over):
-                            if st.session_state.action_points > 0
-# ================= 11. 危机倒计时 修复版 =================
-@st.fragment(run_every="1s")
-def crisis_countdown():
-    ss = st.session_state
-    if ss.get("game_over") or ss.get("time_period") !=4:
-        return
-    elapsed = time.time() - ss.get("crisis_start_time", time.time())
-    time_left = max(0, 90 - int(elapsed))
-    if time_left <= 0:
-        ss.messages.append({"role":"assistant","content":"⏰抢救超时！患儿循环衰竭，抢救无效。"})
-        ss.disease_progress = 100
-        ss.game_over = True
-        st.rerun()
-    st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！")
-
-# ================= 12. 游戏主逻辑 =================
-if st.session_state.screen == "game":
-    case = CASES_CONFIG[st.session_state.current_case]
-    mode = st.session_state.game_mode
-    defaults = {
-        "messages": [{"role": "assistant", "content": "医生！您快看看我家孩子！"}],
-        "trust_score": 40 if mode == "easy" else 20,
-        "action_points": 5 if mode == "easy" else 3,
-        "disease_progress": 30,
-        "game_over": False, "time_period": 1, "unlocked_clues": [], "final_evaluation": None,
-        "decision_made": {}, "penalty_log": [], "crisis_actions": [], "crisis_correct_count": 0,
-        "final_score": 0, "final_title": "", "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
-        "diagnosis_made": None, "diagnosis_processed": False, "auscultation_mode": False, "auscultation_completed": False,
-        "physical_exam_done": {}, "achievements": st.session_state.get("achievements", []),
-        "first_act_clue": False, "excluded_diseases": [],
-        "comm_made": False, "last_action_time": time.time(), "crisis_start_time": time.time(),
-        "record_saved": False, "intro_video_played": False
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-
-    SCENARIO_DATA = {
-        1: {"time": "凌晨 2:00", "title": "🎬 第一幕：急诊室初遇", "mode": "free"},
-        2: {"time": "凌晨 2:30", "title": "🎬 第二幕：初步判断", "mode": "decision"},
-        3: {"time": "凌晨 2:45", "title": "🎬 第三幕：迷雾重重", "mode": "free"},
-        4: {"time": "凌晨 3:00", "title": "🎬 第四幕：生死时速", "mode": "crisis"},
-        5: {"time": "凌晨 3:15", "title": "🎬 第五幕：医患沟通", "mode": "communication"},
-        6: {"time": "凌晨 3:30", "title": "🎬 第六幕：结案复盘", "mode": "end"}
-    }
-    st.sidebar.markdown("---")
-    st.sidebar.caption(f"当前病例：{case['disease']}")
-    if st.sidebar.button("🏠 返回主菜单"):
-        keep = {"theme", "player_id", "player_name", "achievements"}
-        for key in list(st.session_state.keys()):
-            if key not in keep:
-                del st.session_state[key]
-        st.session_state.screen = "start"
-        st.rerun()
-    render_achievements()
-
-    if st.session_state.time_period == 1 and not st.session_state.intro_video_played:
-        st.subheader("🎬 急诊室画面")
-        if os.path.exists("intro_er.mp4"):
-            st.video("intro_er.mp4", autoplay=True, muted=True)
-        else:
-            st.info("（此处为开场视频：深夜急诊，一位母亲抱着孩子冲进抢救室…）")
-        if st.button("⏭️ 跳过开场", disabled=st.session_state.game_over):
-            st.session_state.intro_video_played = True
-            st.rerun()
-        st.session_state.intro_video_played = True
-
-    st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
-
-    col_left, col_center, col_right = st.columns([1.1, 2.5, 1.2])
-    with col_left:
-        st.subheader("📈 生命体征")
-        dp = st.session_state.disease_progress
-        render_monitor(dp)
-        if dp < 40:
-            st.caption("🧠 意识：轻度烦躁")
-        elif dp < 70:
-            st.caption("🧠 意识：明显烦躁")
-        elif dp < 90:
-            st.caption("🧠 意识：发绀、烦躁")
-        else:
-            st.caption("🧠 意识：意识模糊")
-        st.divider()
-        if not st.session_state.game_over:
-            tp = st.session_state.time_period
-            ap = st.session_state.action_points
-            if tp == 1:
-                if ap <= 2:
-                    if st.button("▶️ 进入第二幕：初步判断", use_container_width=True, type="primary", disabled=st.session_state.game_over):
-                        st.session_state.time_period = 2
-                        adjust_disease_progress(10)
-                        st.rerun()
-                else:
-                    st.caption(f"💡 建议再问诊 {ap - 2} 次（剩余行动点 {ap}）")
-            if tp == 3:
-                if st.button("🚨 突发事件！进入第四幕", use_container_width=True, disabled=st.session_state.game_over):
-                    st.session_state.time_period = 4
-                    st.session_state.action_points = 3
-                    adjust_disease_progress(15)
-                    st.session_state.crisis_start_time = time.time()
-                    st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，病情急剧加重）医生！救救他！"})
-                    st.rerun()
-            if tp == 4 and st.session_state.crisis_correct_count >= 2:
-                if st.button("✅ 进入第五幕", use_container_width=True, disabled=st.session_state.game_over):
-                    st.session_state.score_emergency += 20
-                    st.session_state.time_period = 5
-                    st.session_state.action_points = 5
-                    st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿生命体征平稳）"})
-                    st.rerun()
-            if tp == 5 and not st.session_state.comm_made:
-                st.warning("⚠️ 交代病情：")
-                if st.button("A. 赶紧办住院", key="c_a", disabled=st.session_state.game_over):
-                    st.session_state.comm_made = True
-                    st.session_state.trust_score -= 10
-                    st.rerun()
-                if st.button("B. 病情很重，可能窒息/危险", key="c_b", disabled=st.session_state.game_over):
-                    st.session_state.comm_made = True
-                    st.session_state.trust_score -= 5
-                    st.rerun()
-                if st.button("C. 您别自责，送来及时，我们会尽力", key="c_c", disabled=st.session_state.game_over):
-                    st.session_state.comm_made = True
-                    st.session_state.trust_score += 15
-                    st.session_state.score_empathy += 15
-                    st.rerun()
-            if tp == 5 and st.session_state.comm_made:
-                if st.button("▶️ 进入复盘", use_container_width=True, disabled=st.session_state.game_over):
-                    st.session_state.time_period = 6
-                    st.rerun()
-        st.divider()
-        if st.session_state.time_period >= 5 and not st.session_state.game_over:
-            if st.button("📝 提交诊断，结束", use_container_width=True, disabled=st.session_state.game_over):
-                st.session_state.game_over = True
-                st.rerun()
-        if st.button("🔄 重新开始", use_container_width=True):
-            keep = {"theme", "screen", "current_case", "game_mode", "player_id", "player_name", "achievements"}
-            for key in list(st.session_state.keys()):
-                if key not in keep:
-                    del st.session_state[key]
-            st.session_state.screen = "start"
-            st.rerun()
-
-    with col_right:
-        st.subheader("🔍 线索夹")
-        if mode == "hard":
-            for i, clue in enumerate(case["clues"]):
-                if clue in st.session_state.unlocked_clues:
-                    st.success(f"✅ {clue}")
-                else:
-                    st.text(f"🔒 未知线索 {i+1}/{len(case['clues'])}")
-        else:
-            for clue in case["clues"]:
-                if clue in st.session_state.unlocked_clues:
-                    st.success(f"✅ {clue}")
-                else:
-                    st.text(f"🔒 未知线索")
-        if st.session_state.penalty_log:
-            st.divider()
-            st.caption("📝 失误记录")
-            for log in st.session_state.penalty_log:
-                st.warning(log)
-
-    with col_center:
-        if not st.session_state.game_over:
-            st.title(SCENARIO_DATA[st.session_state.time_period]["title"])
-            tp_now = st.session_state.time_period
-
-            if tp_now == 1:
-                st.markdown(f"""
-                <div style="background: rgba(0, 180, 216, 0.1); border-left: 4px solid #00b4d8;
-                            padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="font-size: 15px; font-weight: bold; color: #00b4d8; margin-bottom: 5px;">🚑 前情提要</div>
-                    <div style="font-size: 14px; color: #e2e8f0; line-height: 1.6;">
-                        <b>患儿：</b>{case['patient']} <br>
-                        <b>场景：</b>{case['description']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'''
+<div style="background: rgba(0, 180, 216, 0.1); border-left: 4px solid #00b4d8;
+            padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+    <div style="font-size: 15px; font-weight: bold; color: #00b4d8; margin-bottom: 5px;">🚑 前情提要</div>
+    <div style="font-size: 14px; color: #e2e8f0; line-height: 1.6;">
+        <b>患儿：</b>{case['patient']} <br>
+        <b>场景：</b>{case['description']}
+    </div>
+</div>''', unsafe_allow_html=True)
                 st.caption("💡 任务：安抚情绪，通过问诊了解发病时间和特征。")
             elif tp_now == 2:
                 st.info("💡 任务：综合已有线索，做出初步诊断。")
@@ -1153,125 +953,132 @@ if st.session_state.screen == "game":
                                 st.session_state.action_points -= 1
                                 st.session_state.auscultation_mode = True
                                 st.rerun()
-            if st.session_state.auscultation_mode:
-                st.warning("🩺 听诊音频：")
-                if os.path.exists(case["audio"]):
-                    st.audio(case["audio"], format="audio/mp3")
-                st.write("请判断：")
-                if st.button("异常呼吸音/杂音", disabled=st.session_state.game_over):
-                    st.session_state.unlocked_clues.append(case["clues"][0])
-                    st.session_state.score_diagnosis += 10
-                    st.session_state.auscultation_mode = False
-                    st.session_state.auscultation_completed = True
-                    st.rerun()
-                if st.button("正常呼吸音", disabled=st.session_state.game_over):
-                    st.session_state.auscultation_mode = False
-                    st.session_state.auscultation_completed = True
-                    st.rerun()
-            else:
-                with st.container(height=400):
-                    for msg in st.session_state.messages:
-                        render_message(msg["role"], msg["content"])
-                if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
-                    crisis_countdown()
-                    if st.session_state.action_points > 0:
-                        for opt_key, opt_val in case["crisis"].items():
-                            if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True, disabled=st.session_state.game_over):
-                                st.session_state.action_points -= 1
-                                st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
-                                st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
-                                adjust_disease_progress(opt_val["disease"])
-                                if opt_val["type"] == "correct":
-                                    st.session_state.crisis_correct_count += 1
-                                else:
-                                    st.session_state.penalty_log.append(opt_val["label"])
-                                if st.session_state.disease_progress >= 100:
-                                    st.session_state.game_over = True
-                                st.rerun()
-                    else:
-                        if st.session_state.crisis_correct_count < 2:
-                            st.error("🚨 行动点耗尽！患儿情况危急，请呼叫支援！")
-                            if st.button("📞 呼叫上级医师支援（恢复2点行动点，病情+15）", use_container_width=True, disabled=st.session_state.game_over):
-                                st.session_state.action_points = 2
-                                adjust_disease_progress(15)
-                                st.session_state.score_emergency -= 5
-                                st.rerun()
-                elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
-                    if prompt := st.chat_input("输入问诊或检查...", disabled=st.session_state.game_over):
-                        if st.session_state.action_points <= 0:
-                            st.warning("行动点已用完，请进入下一幕。")
+                if st.session_state.auscultation_mode:
+                    st.warning("🩺 听诊音频：")
+                    if os.path.exists(case["audio"]):
+                        st.audio(case["audio"], format="audio/mp3")
+                    st.write("请判断：")
+                    if st.button("异常呼吸音/杂音", disabled=st.session_state.game_over):
+                        st.session_state.unlocked_clues.append(case["clues"][0])
+                        st.session_state.score_diagnosis += 10
+                        st.session_state.auscultation_mode = False
+                        st.session_state.auscultation_completed = True
+                        st.rerun()
+                    if st.button("正常呼吸音", disabled=st.session_state.game_over):
+                        st.session_state.auscultation_mode = False
+                        st.session_state.auscultation_completed = True
+                        st.rerun()
+                else:
+                    with st.container(height=400):
+                        for msg in st.session_state.messages:
+                            render_message(msg["role"], msg["content"])
+                    if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
+                        crisis_countdown()
+                        if st.session_state.action_points > 0:
+                            for opt_key, opt_val in case["crisis"].items():
+                                if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True, disabled=st.session_state.game_over):
+                                    st.session_state.action_points -= 1
+                                    st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
+                                    st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
+                                    adjust_disease_progress(opt_val["disease"])
+                                    if opt_val["type"] == "correct":
+                                        st.session_state.crisis_correct_count += 1
+                                    else:
+                                        st.session_state.penalty_log.append(opt_val["label"])
+                                    if st.session_state.disease_progress >= 100:
+                                        st.session_state.game_over = True
+                                    st.rerun()
                         else:
-                            temp_msg_user = {"role":"user","content":prompt}
-                            hit_clues = match_clues(prompt, case)
-                            new_hits = [c for c in hit_clues if c not in st.session_state.unlocked_clues]
-                            with st.spinner("妈妈正在回答…"):
-                                reply = call_mom_llm(st.session_state.current_case, case, st.session_state.messages+[temp_msg_user], hit_clues)
-                            if not reply:
-                                reply = pick_fallback(hit_clues)
-                            st.session_state.action_points -=1
-                            st.session_state.messages.append(temp_msg_user)
-                            for clue in new_hits:
-                                st.session_state.unlocked_clues.append(clue)
-                                st.session_state.score_inquiry += 8
-                                adjust_disease_progress(-5)
-                            if new_hits:
-                                st.session_state.first_act_clue = True
-                            st.session_state.messages.append({"role": "assistant", "content": reply})
-                            st.rerun()
-    if st.session_state.game_over:
-        st.divider()
-        st.header("🩺 带教老师复盘")
-        if st.session_state.final_score == 0:
-            total = (st.session_state.score_inquiry + st.session_state.score_diagnosis + st.session_state.score_emergency + st.session_state.score_empathy)
-            st.session_state.final_score = min(total,100)
-            if total >= 80:
-                st.session_state.final_title = "🏆 儿科急诊之光"
-            elif total >= 60:
-                st.session_state.final_title = "🌟 有潜力的住院医"
-            else:
-                st.session_state.final_title = "📚 还需回炉重造"
-        if not st.session_state.record_saved:
-            check_achievements(case)
-            save_record({
-                "player_id": st.session_state.player_id,
-                "player_name": st.session_state.player_name,
-                "case_id": st.session_state.current_case,
-                "case_name": case["name"],
-                "disease": case["disease"],
-                "mode": st.session_state.game_mode,
-                "final_score": st.session_state.final_score,
-                "score_inquiry": st.session_state.score_inquiry,
-                "score_diagnosis": st.session_state.score_diagnosis,
-                "score_emergency": st.session_state.score_emergency,
-                "score_empathy": st.session_state.score_empathy,
-                "disease_progress": st.session_state.disease_progress,
-                "survived": 1 if st.session_state.disease_progress < 100 else 0,
-                "mistakes": _json.dumps(st.session_state.penalty_log, ensure_ascii=False),
-                "achievements": _json.dumps(st.session_state.achievements, ensure_ascii=False),
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            })
-            st.session_state.record_saved = True
-        st.info(f"### {st.session_state.final_title}\n最终得分：{st.session_state.final_score} / 100")
-        st.subheader("📊 个人能力雷达图")
-        r_data = [
-            max(1, min(100, st.session_state.score_inquiry * 3)),
-            max(1, min(100, st.session_state.score_diagnosis * 2)),
-            max(1, min(100, st.session_state.score_emergency * 2)),
-            max(1, min(100, st.session_state.score_empathy * 2))
-        ]
-        fig = go.Figure(go.Scatterpolar(
-            r=r_data,
-            theta=['问诊', '诊断', '急救', '沟通'],
-            fill='toself'
-        ))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
-        st.plotly_chart(fig, use_container_width=True)
-        st.subheader("🏅 本局成就")
-        render_achievements(container=st)
-        if st.button("🏠 返回主菜单"):
-            keep = {"theme", "player_id", "player_name", "achievements"}
-            for key in list(st.session_state.keys()):
-                if key not in keep:
-                    del st.session_state[key]
-            st.session_state.screen = "start"
-            st.rerun()
+                            if st.session_state.crisis_correct_count < 2 and not st.session_state.call_support_used:
+                                st.error("🚨 行动点全部耗尽！你已经没有手段继续抢救。")
+                                st.warning("⚠️呼叫上级会付出沉重代价，本局仅可呼叫一次！")
+                                if st.button("📞 紧急呼叫上级医师支援【本局最多1次】",
+                                            use_container_width=True,
+                                            disabled=st.session_state.game_over):
+                                    st.session_state.call_support_used = True
+                                    st.session_state.action_points = 2
+                                    adjust_disease_progress(18)
+                                    st.session_state.score_emergency -= 12
+                                    st.session_state.messages.append({"role":"assistant","content":"（上级医师匆匆赶来接手抢救，你退居辅助位置。患儿因为延误，情况进一步加重。）"})
+                                    st.rerun()
+                    elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
+                        if prompt := st.chat_input("输入问诊或检查...", disabled=st.session_state.game_over):
+                            if st.session_state.action_points <= 0:
+                                st.warning("行动点已用完，请进入下一幕。")
+                            else:
+                                temp_msg_user = {"role":"user","content":prompt}
+                                hit_clues = match_clues(prompt, case)
+                                new_hits = [c for c in hit_clues if c not in st.session_state.unlocked_clues]
+                                with st.spinner("妈妈正在回答…"):
+                                    reply = call_mom_llm(st.session_state.current_case, case, st.session_state.messages+[temp_msg_user], hit_clues)
+                                if not reply:
+                                    reply = pick_fallback(hit_clues)
+                                st.session_state.action_points -=1
+                                st.session_state.messages.append(temp_msg_user)
+                                for clue in new_hits:
+                                    st.session_state.unlocked_clues.append(clue)
+                                    st.session_state.score_inquiry += 8
+                                    adjust_disease_progress(-5)
+                                if new_hits:
+                                    st.session_state.first_act_clue = True
+                                st.session_state.messages.append({"role": "assistant", "content": reply})
+                                st.rerun()
+        if st.session_state.game_over:
+            st.divider()
+            st.header("🩺 带教老师复盘")
+            if st.session_state.final_score == 0:
+                total = (st.session_state.score_inquiry + st.session_state.score_diagnosis + st.session_state.score_emergency + st.session_state.score_empathy)
+                st.session_state.final_score = min(total,100)
+                if total >= 80:
+                    st.session_state.final_title = "🏆 儿科急诊之光"
+                elif total >= 60:
+                    st.session_state.final_title = "🌟 有潜力的住院医"
+                else:
+                    st.session_state.final_title = "📚 还需回炉重造"
+            if not st.session_state.record_saved:
+                check_achievements(case)
+                save_record({
+                    "player_id": st.session_state.player_id,
+                    "player_name": st.session_state.player_name,
+                    "case_id": st.session_state.current_case,
+                    "case_name": case["name"],
+                    "disease": case["disease"],
+                    "mode": st.session_state.game_mode,
+                    "final_score": st.session_state.final_score,
+                    "score_inquiry": st.session_state.score_inquiry,
+                    "score_diagnosis": st.session_state.score_diagnosis,
+                    "score_emergency": st.session_state.score_emergency,
+                    "score_empathy": st.session_state.score_empathy,
+                    "disease_progress": st.session_state.disease_progress,
+                    "survived": 1 if st.session_state.disease_progress < 100 else 0,
+                    "mistakes": _json.dumps(st.session_state.penalty_log, ensure_ascii=False),
+                    "achievements": _json.dumps(st.session_state.achievements, ensure_ascii=False),
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                })
+                st.session_state.record_saved = True
+            st.info(f"### {st.session_state.final_title}\n最终得分：{st.session_state.final_score} / 100")
+            if st.session_state.call_support_used:
+                st.warning("⚠️本局曾呼叫上级医师支援，【妙手回春】【急诊之光】成就未解锁。")
+            st.subheader("📊 个人能力雷达图")
+            r_data = [
+                max(1, min(100, st.session_state.score_inquiry * 3)),
+                max(1, min(100, st.session_state.score_diagnosis * 2)),
+                max(1, min(100, st.session_state.score_emergency * 2)),
+                max(1, min(100, st.session_state.score_empathy * 2))
+            ]
+            fig = go.Figure(go.Scatterpolar(
+                r=r_data,
+                theta=['问诊', '诊断', '急救', '沟通'],
+                fill='toself'
+            ))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
+            st.plotly_chart(fig, use_container_width=True)
+            st.subheader("🏅 本局成就")
+            render_achievements(container=st)
+            if st.button("🏠 返回主菜单"):
+                keep = {"theme", "player_id", "player_name", "achievements"}
+                for key in list(st.session_state.keys()):
+                    if key not in keep:
+                        del st.session_state[key]
+                st.session_state.screen = "start"
+                st.rerun()
