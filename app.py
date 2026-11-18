@@ -1,24 +1,14 @@
 import streamlit as st
-import os
-import time
-import json
-import json as _json
-import random
-import base64
-import sqlite3
-import uuid
-import html
-import re
+import streamlit.components.v1 as components
+import os, time, json, base64, html, sqlite3, uuid
 from datetime import datetime
 from contextlib import contextmanager
 import pandas as pd
-from openai import OpenAI
 import plotly.graph_objects as go
 import plotly.express as px
-import streamlit.components.v1 as components
-from collections import Counter
+from openai import OpenAI
 
-# ================= 1. 配置区 =================
+# ================= 1. 环境与 API =================
 os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
 os.environ["NO_PROXY"] = "*"
@@ -26,13 +16,13 @@ os.environ["NO_PROXY"] = "*"
 try:
     API_KEY = st.secrets["ZHIPU_API_KEY"]
 except Exception:
-    API_KEY = "sk-你的真实智谱AI密钥"  # 替换为你的Key
+    API_KEY = "sk-你的真实智谱AI密钥"
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 四大病例数据库 =================
+# ================= 2. 四大病例 =================
 CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
@@ -96,329 +86,79 @@ CASES_CONFIG = {
     }
 }
 
-# ================= 2.5 AI 对话层（表演层）与线索判定层 =================
-CLUE_SYNONYMS = {
-    "犬吠样咳嗽":     ["小狗叫", "狗叫", "海豹叫", "空空声", "像狗", "犬吠", "croup"],
-    "夜间加重":       ["半夜", "夜里", "晚上更", "夜间", "睡着后", "后半夜"],
-    "吸气性喉鸣":     ["吸气有声", "吸气响", "喉咙响", "吸气鸣", "拉风箱", "吸气的时候有声音"],
-    "白天感冒史":     ["白天感冒", "之前感冒", "流鼻涕", "有点感冒", "咳嗽几天", "着凉"],
-    "三凹征":         ["胸口凹", "锁骨凹", "肋骨凹", "吸气凹", "胸骨上窝", "凹陷", "凹进去"],
-    "进食呛咳史":     ["吃花生", "吃东西呛", "吃坚果", "边吃边咳", "呛到", "吃东西时咳"],
-    "剧烈呛咳":       ["咳得厉害", "剧烈咳嗽", "咳得弓起来", "咳不停", "咳得停不下来"],
-    "呼吸音不对称":   ["两边呼吸不一样", "一边响一边不响", "呼吸不对称", "两边声音不同"],
-    "面色发绀":       ["脸发紫", "嘴唇紫", "脸憋紫", "脸色青紫", "脸都紫了"],
-    "既往哮喘史":     ["以前喘过", "有哮喘", "以前也喘", "小时候就喘", "老毛病"],
-    "过敏史":         ["过敏", "对花粉", "湿疹", "花粉过敏"],
-    "呼气性呼吸困难": ["呼气费力", "呼气长", "呼气困难", "出气费劲", "出气比进气长"],
-    "双肺哮鸣音":     ["喘鸣", "呼呼响", "肺里有声音", "哨音", "吹哨子", "吱吱响"],
-    "高热":           ["发烧", "高烧", "39度", "40度", "体温很高", "烧得厉害"],
-    "流涎":           ["流口水", "一直流口水", "口水多", "口水流不停"],
-    "吞咽困难":       ["咽不下", "不敢咽", "吞东西疼", "不肯吃东西", "咽东西费劲"],
-    "拒绝平卧":       ["一躺下就", "不肯躺", "躺下就喘", "坐起来", "只能坐着", "不愿平躺"],
-    "无犬吠样咳嗽":   ["不是狗叫", "不像狗叫", "没有狗叫", "不是犬吠", "咳嗽声音不一样"],
+# ================= 3. 通用成就 =================
+GLOBAL_ACHIEVEMENTS = {
+    "first_inquiry": {"icon": "🩺", "name": "初次问诊", "desc": "迈出问诊第一步",
+                      "check": lambda ss, c: any(m.get("role") == "user" for m in getattr(ss, "messages", []))},
+    "perfect_score": {"icon": "🏆", "name": "急诊之光", "desc": "单局得分 ≥ 80",
+                      "check": lambda ss, c: getattr(ss, "final_score", 0) >= 80},
+    "all_rounder":   {"icon": "📚", "name": "全能住院医", "desc": "通关全部 4 个病例",
+                      "check": lambda ss, c: len(getattr(ss, "completed_cases", set())) >= 4},
+    "empathy":       {"icon": "💬", "name": "医者仁心", "desc": "用共情方式交代病情",
+                      "check": lambda ss, c: getattr(ss, "score_empathy", 0) > 0},
 }
 
-BANNED_TERMS = [
-    "急性", "喉炎", "会厌", "哮喘", "异物", "支气管", "诊断", "确诊",
-    "三凹征", "哮鸣", "喉鸣", "发绀", "呼吸困难", "Stridor", "Wheezing",
-    "糖皮质激素", "肾上腺素", "雾化", "地塞米松", "海姆立克", "插管", "气管切开",
-]
-
-MOM_FACTS = {
-    "laryngitis": [
-        "他咳起来像小狗叫，空空的，我从来没听过这种声音",
-        "半夜突然加重，之前白天有点流鼻涕、着凉",
-        "吸气的时候喉咙里有响声，胸口还会凹进去一块",
-        "孩子很烦躁，坐起来好像好一点",
-    ],
-    "foreign_body": [
-        "刚才在吃花生，突然就咳得整个人弓起来了",
-        "咳得停不下来，脸都憋紫了",
-        "一边呼吸声大一边小，听着不对劲",
-        "孩子很害怕，一直哭",
-    ],
-    "asthma": [
-        "她以前也这样喘过好几次，小时候就有这毛病",
-        "对花粉过敏，小时候长过湿疹",
-        "这次呼气很费力，出气比进气长",
-        "肺里呼呼响，像吹哨子一样",
-    ],
-    "epiglottitis": [
-        "发高烧，39度多，烫得吓人",
-        "一直流口水，咽都咽不下去，不肯吃东西",
-        "一躺下就喘不上气，非要坐着",
-        "咳嗽不是那种小狗叫的声音",
-    ],
-}
-
-FALLBACK_REPLIES = {
-    "犬吠样咳嗽":   "他咳起来像小狗叫，我从来没听过这种声音…",
-    "三凹征":       "他吸气的时候，胸口会凹进去一块，看着吓人…",
-    "进食呛咳史":   "刚才在吃花生，突然就咳得整个人弓起来了…",
-    "剧烈呛咳":     "他咳得停不下来，整个人都弓起来了…",
-    "面色发绀":     "他脸都憋紫了，医生你快看看啊…",
-    "流涎":         "他一直流口水，咽都咽不下去…",
-    "拒绝平卧":     "他一躺下就喘不上气，非要坐着…",
-    "高热":         "他烧到39度多，烫得吓人…",
-    "既往哮喘史":   "他以前也这样喘过好几次…",
-    "双肺哮鸣音":   "他肺里呼呼响，像吹哨子一样…",
-    "default":      "医生，我真的好担心，求您快帮帮孩子吧！",
-}
-
-def _ai_available() -> bool:
-    return bool(API_KEY) and "你的" not in str(API_KEY) and len(str(API_KEY)) > 20
-
-def match_clues(prompt: str, case: dict) -> list:
-    text = prompt.lower()
-    hits = []
-    for clue in case["clues"]:
-        synonyms = [clue] + CLUE_SYNONYMS.get(clue, [])
-        if any(s.lower() in text for s in synonyms):
-            hits.append(clue)
-    return hits
-
-def sanitize_reply(reply):
-    if not isinstance(reply, str):
-        return None
-    reply = reply.strip()
-    if not reply or len(reply) > 80:
-        return None
-    if any(t in reply for t in BANNED_TERMS):
-        return None
-    return reply
-
-def pick_fallback(hit_clues: list) -> str:
-    for c in hit_clues:
-        if c in FALLBACK_REPLIES:
-            return FALLBACK_REPLIES[c]
-    return FALLBACK_REPLIES["default"]
-
-def build_mom_system(case_id: str, case: dict) -> str:
-    facts = MOM_FACTS.get(case_id, [])
-    fact_lines = "\n".join(f"- {f}" for f in facts)
-    return f"""你是一位{case['patient']}的妈妈，此刻在急诊室，非常焦虑。
-你只知道自己亲眼看到、亲耳听到的事情（见下），你完全不懂医学，从没听过任何疾病名称。
-【你知道的事实】
-{fact_lines}
-【说话规则】
-1. 只用大白话，像普通家长一样说话，绝对不说任何医学名词、病名、检查名、药名。
-2. 绝不下诊断，绝不说"是不是XX病"。
-3. 每次只说 1~2 句话，不超过50个字，语气焦虑、无助。
-4. 医生问到你不知道的，就说"这我也不懂啊医生"。
-5. 只输出 JSON：{{"reply": "你的回答"}}，不要输出其他任何内容。"""
-
-def _clean_history(history: list) -> list:
-    out = []
-    for m in history:
-        c = re.sub(r"（提示：[^）]*）", "", m.get("content", "")).strip()
-        if c:
-            out.append({"role": "user" if m.get("role") == "user" else "assistant",
-                        "content": c})
-    return out
-
-def call_mom_llm(case_id: str, case: dict, history: list, hit_clues: list):
-    if not _ai_available():
-        return None
-    system = build_mom_system(case_id, case)
-    msgs = [{"role": "system", "content": system}] + _clean_history(history[-6:])
-    for _ in range(2):
-        try:
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=msgs,
-                temperature=0.8,
-                max_tokens=120,
-                timeout=6,
-                response_format={"type": "json_object"},
-            )
-            data = _json.loads(resp.choices[0].message.content)
-            reply = sanitize_reply(data.get("reply"))
-            if reply:
-                return reply
-        except Exception:
-            continue
-    return None
-
-# =====================【成就展览馆路由，放在最前面！】=====================
-if st.session_state.screen == "achievement_gallery":
-    render_achievement_gallery_page()
-    st.stop()
-
-st.sidebar.markdown("### 🎨 主题设置")
-if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" else "🌙 夜晚模式"):
-    st.session_state.theme = "day" if st.session_state.theme == "night" else "night"; st.rerun()
-
-# 侧边栏新增成就展览馆按钮
-st.sidebar.markdown("---")
-if st.sidebar.button("🏅 成就展览馆"):
-    st.session_state.screen = "achievement_gallery"
-    st.rerun()
-
-# ================= 3. 成就系统【通用 + 分病例专属成就】 =================
-# 通用成就（所有病例都可以解锁）
-COMMON_ACHIEVEMENTS = {
-    "common_first_inquiry": {"icon": "🩺", "name": "初次问诊", "desc": "迈出问诊第一步"},
-    "common_all_clues":     {"icon": "🔍", "name": "明察秋毫", "desc": "集齐本局全部线索"},
-    "common_correct_dx":    {"icon": "🎯", "name": "一针见血", "desc": "初步诊断完全正确"},
-    "common_empathy":       {"icon": "💬", "name": "医者仁心", "desc": "使用共情话术交代病情"},
-    "common_perfect":       {"icon": "🏆", "name": "急诊之光", "desc": "本局得分≥80，未呼叫上级支援"},
-}
-
-# 每个病例独有的成就，key和CASES_CONFIG一一对应
-CASE_SPECIAL_ACHIEVEMENTS = {
+# ================= 4. 病例专属成就 =================
+CASE_ACHIEVEMENTS = {
     "laryngitis": {
-        "laryngitis_calm_larynx": {"icon": "🌬️", "name": "冷静控喉", "desc": "急性喉炎：保持患儿安静，不触发哭闹加重水肿"},
-        "laryngitis_no_laryngoscope": {"icon": "🛡️", "name": "规避喉痉挛", "desc": "急性喉炎：没有使用压舌板强行检查咽喉，避免致命喉痉挛"},
+        "bark_cough":   {"icon": "🐕", "name": "犬吠辨识者", "desc": "识别出「犬吠样咳嗽」",
+                         "check": lambda ss, c: "犬吠样咳嗽" in getattr(ss, "unlocked_clues", [])},
+        "calm_parent":  {"icon": "🤝", "name": "安抚专家",   "desc": "信任值提升至 ≥ 50",
+                         "check": lambda ss, c: getattr(ss, "trust_score", 0) >= 50},
+        "sit_and_neb":  {"icon": "🪑", "name": "坐位雾化师", "desc": "成功抢救，患儿转危为安",
+                         "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                and getattr(ss, "crisis_correct_count", 0) >= 1
+                                                and getattr(ss, "disease_progress", 100) < 100},
+        "night_warrior":{"icon": "🌙", "name": "深夜守护者", "desc": "以病情度 < 50 通关",
+                         "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                and getattr(ss, "disease_progress", 100) < 50},
     },
     "foreign_body": {
-        "foreign_body_heim": {"icon": "⚡", "name": "生死海姆立克", "desc": "气道异物：正确实施海姆立克/拍背压胸急救"},
-        "foreign_body_no_dig": {"icon": "🚫", "name": "拒绝盲目抠挖", "desc": "气道异物：没有手指盲目抠挖咽部，防止异物推深"},
+        "peanut_detective": {"icon": "🥜", "name": "花生侦探",   "desc": "识别出「进食呛咳史」",
+                             "check": lambda ss, c: "进食呛咳史" in getattr(ss, "unlocked_clues", [])},
+        "heimlich_master":  {"icon": "🤲", "name": "海姆立克大师","desc": "急救处置正确 ≥ 2 次",
+                             "check": lambda ss, c: getattr(ss, "crisis_correct_count", 0) >= 2},
+        "rapid_response":   {"icon": "⚡", "name": "极速救援",   "desc": "以病情度 ≤ 70 通关",
+                             "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                    and getattr(ss, "disease_progress", 100) <= 70},
+        "clear_airway":     {"icon": "💨", "name": "气道清道夫", "desc": "以病情度 < 60 通关",
+                             "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                    and getattr(ss, "disease_progress", 100) < 60},
     },
     "asthma": {
-        "asthma_relief": {"icon": "💨", "name": "平喘先锋", "desc": "支气管哮喘：正确使用支气管舒张剂急救"},
-        "asthma_no_abx": {"icon": "✅", "name": "理性不用抗生素", "desc": "支气管哮喘：没有滥用抗生素治疗哮喘"},
+        "history_hunter": {"icon": "📋", "name": "病史侦探", "desc": "识别出「既往哮喘史」",
+                           "check": lambda ss, c: "既往哮喘史" in getattr(ss, "unlocked_clues", [])},
+        "nebulizer_pro":  {"icon": "🌬️", "name": "雾化专家", "desc": "急救处置正确 ≥ 2 次",
+                           "check": lambda ss, c: getattr(ss, "crisis_correct_count", 0) >= 2},
+        "steady_breath":  {"icon": "🫁", "name": "呼吸守护", "desc": "以病情度 < 50 通关",
+                           "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                  and getattr(ss, "disease_progress", 100) < 50},
+        "rational_drug":  {"icon": "💊", "name": "合理用药", "desc": "全程未出现抗生素滥用",
+                           "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                  and all("抗生素" not in str(x) for x in getattr(ss, "penalty_log", []))},
     },
     "epiglottitis": {
-        "epiglottis_protect": {"icon": "🛡️", "name": "会厌守护神", "desc": "急性会厌炎：全程没有强行压舌板查体"},
-        "epiglottis_prepare_airway": {"icon": "🩻", "name": "气道预备", "desc": "急性会厌炎：选择正确处置，提前做好气道抢救准备"},
-    }
+        "drool_watcher": {"icon": "💧", "name": "流涎观察员", "desc": "识别出「流涎」",
+                          "check": lambda ss, c: "流涎" in getattr(ss, "unlocked_clues", [])},
+        "no_flat":       {"icon": "🚫", "name": "拒绝平卧",   "desc": "识别出「拒绝平卧」",
+                          "check": lambda ss, c: "拒绝平卧" in getattr(ss, "unlocked_clues", [])},
+        "safe_exam":     {"icon": "🛡️", "name": "安全查体",   "desc": "全程未使用压舌板刺激咽喉",
+                          "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                 and all("压舌板" not in str(x) for x in getattr(ss, "penalty_log", []))},
+        "high_risk_hero":{"icon": "👑", "name": "高危挑战者", "desc": "以困难模式通关本病例",
+                          "check": lambda ss, c: getattr(ss, "game_over", False)
+                                                 and getattr(ss, "game_mode", "") == "hard"},
+    },
 }
 
-# 工具：合并所有成就，给展览馆用
-def get_all_achievement_dict():
-    all_ach = dict(COMMON_ACHIEVEMENTS)
-    for case_id, ach_dict in CASE_SPECIAL_ACHIEVEMENTS.items():
-        all_ach.update(ach_dict)
-    return all_ach
+def flatten_achievements():
+    flat = {f"global:{k}": v for k, v in GLOBAL_ACHIEVEMENTS.items()}
+    for cid, achs in CASE_ACHIEVEMENTS.items():
+        for k, v in achs.items():
+            flat[f"{cid}:{k}"] = v
+    return flat
 
-# 解锁成就函数（自动去重，不会重复解锁）
-def unlock_achievement(aid):
-    if "achievements" not in st.session_state:
-        st.session_state.achievements = []
-    if aid not in st.session_state.achievements:
-        st.session_state.achievements.append(aid)
-
-# 结算时检查、判定本局所有成就
-def check_achievements(case_id, case):
-    ss = st.session_state
-    if "achievements" not in ss:
-        ss.achievements = []
-
-    # -------- 通用成就判定 --------
-    if any(m.get("role") == "user" for m in ss.messages):
-        unlock_achievement("common_first_inquiry")
-    if len(ss.unlocked_clues) >= len(case["clues"]):
-        unlock_achievement("common_all_clues")
-    if ss.diagnosis_made and case["diagnosis"].get(ss.diagnosis_made) == case["disease"]:
-        unlock_achievement("common_correct_dx")
-    if ss.score_empathy > 0:
-        unlock_achievement("common_empathy")
-    if ss.final_score >= 80 and not ss.get("call_support_used", False):
-        unlock_achievement("common_perfect")
-
-    # -------- 病例专属成就判定 --------
-    if case_id == "laryngitis":
-        harm_opt_label = "强行按压患儿，用压舌板检查咽喉部"
-        if harm_opt_label not in ss.penalty_log:
-            unlock_achievement("laryngitis_no_laryngoscope")
-        if ss.crisis_correct_count >= 1:
-            unlock_achievement("laryngitis_calm_larynx")
-
-    elif case_id == "foreign_body":
-        correct_label = "立即施行海姆立克急救法/拍背压胸"
-        user_contents = [m.get("content", "") for m in ss.messages if m.get("role")=="user"]
-        if correct_label in user_contents:
-            unlock_achievement("foreign_body_heim")
-        harm_dig = "用手指盲目抠挖咽喉"
-        if harm_dig not in ss.penalty_log:
-            unlock_achievement("foreign_body_no_dig")
-
-    elif case_id == "asthma":
-        correct_ast = "吸氧，雾化吸入支气管舒张剂(沙丁胺醇)"
-        user_contents = [m.get("content", "") for m in ss.messages if m.get("role")=="user"]
-        if correct_ast in user_contents:
-            unlock_achievement("asthma_relief")
-        abx_opt = "静脉滴注抗生素"
-        if abx_opt not in ss.penalty_log:
-            unlock_achievement("asthma_no_abx")
-
-    elif case_id == "epiglottitis":
-        harm_epi = "强行使用压舌板检查咽喉部"
-        if harm_epi not in ss.penalty_log:
-            unlock_achievement("epiglottis_protect")
-        correct_epi = "保持坐位，吸氧，静脉使用糖皮质激素，准备气管切开/插管"
-        user_contents = [m.get("content", "") for m in ss.messages if m.get("role")=="user"]
-        if correct_epi in user_contents:
-            unlock_achievement("epiglottis_prepare_airway")
-
-# ===================== 成就渲染函数 =====================
-def render_mini_achievements(container=st.sidebar):
-    """侧边栏迷你展示本局已解锁成就（小缩略图标）"""
-    container.markdown("### 🏅本局成就")
-    all_ach = get_all_achievement_dict()
-    unlocked_list = st.session_state.get("achievements", [])
-    show_items = [all_ach[aid] for aid in unlocked_list if aid in all_ach]
-    if len(show_items) == 0:
-        container.caption("暂未解锁成就")
-        return
-    html_parts = []
-    # 只展示最近6个
-    for item in show_items[-6:]:
-        html_parts.append(f'<span title="{item["desc"]}" style="font-size:22px;margin:0 2px;">{item["icon"]}</span>')
-    container.markdown("".join(html_parts), unsafe_allow_html=True)
-
-
-def render_achievement_gallery_page():
-    """独立页面：完整成就展览馆"""
-    st.markdown('<div style="text-align:center;font-size:40px;font-weight:bold;color:#00b4d8;margin:20px 0;">🏅成就展览馆</div>',unsafe_allow_html=True)
-    unlocked_set = set(st.session_state.get("achievements", []))
-    all_dict = get_all_achievement_dict()
-
-    st.subheader("📌通用成就（全部病例）")
-    cols_com = st.columns(3)
-    for idx,(aid,ach) in enumerate(COMMON_ACHIEVEMENTS.items()):
-        with cols_com[idx%3]:
-            is_unlock = aid in unlocked_set
-            icon_style = "" if is_unlock else "filter:grayscale(1) opacity:0.3;"
-            bg = "rgba(0,180,216,0.15)" if is_unlock else "rgba(80,80,80,0.08)"
-            border = "#00b4d8" if is_unlock else "#444444"
-            st.markdown(f"""
-            <div title="{ach['desc']}" style="text-align:center;background:{bg};border:1px solid {border};border-radius:12px;padding:12px 8px;margin-bottom:10px;">
-                <div style="font-size:30px;{icon_style}">{ach['icon']}</div>
-                <div style="font-weight:bold;margin-top:6px;">{ach['name']}</div>
-                <div style="font-size:12px;opacity:0.7;margin-top:4px;">{ach['desc']}</div>
-            </div>""",unsafe_allow_html=True)
-
-    st.divider()
-    st.subheader("🩺病例专属成就")
-    case_name_map = {
-        "laryngitis":"2岁患儿的犬吠声｜急性感染性喉炎",
-        "foreign_body":"1岁患儿的剧烈呛咳｜气道异物",
-        "asthma":"4岁患儿的反复喘息｜支气管哮喘",
-        "epiglottitis":"3岁患儿的高热与流涎｜急性会厌炎"
-    }
-    for cid,ach_dict in CASE_SPECIAL_ACHIEVEMENTS.items():
-        st.markdown(f"#### 📂 {case_name_map[cid]}")
-        cols_case = st.columns(2)
-        for i,(aid,ach) in enumerate(ach_dict.items()):
-            with cols_case[i%2]:
-                is_unlock = aid in unlocked_set
-                icon_style = "" if is_unlock else "filter:grayscale(1) opacity:0.3;"
-                bg = "rgba(230,57,70,0.12)" if is_unlock else "rgba(80,80,80,0.08)"
-                border = "#e63946" if is_unlock else "#444444"
-                st.markdown(f"""
-                <div title="{ach['desc']}" style="text-align:center;background:{bg};border:1px solid {border};border-radius:12px;padding:12px 8px;margin-bottom:10px;">
-                    <div style="font-size:30px;{icon_style}">{ach['icon']}</div>
-                    <div style="font-weight:bold;margin-top:6px;">{ach['name']}</div>
-                    <div style="font-size:12px;opacity:0.7;margin-top:4px;">{ach['desc']}</div>
-                </div>""",unsafe_allow_html=True)
-        st.markdown("<br>",unsafe_allow_html=True)
-
-    st.divider()
-    if st.button("⬅️ 返回主菜单"):
-        st.session_state.screen = "start"
-        st.rerun()
-# ================= 4. 数据持久化层 (SQLite) =================
+# ================= 5. SQLite 持久化 =================
 DB_PATH = "pedimind_records.db"
 
 @contextmanager
@@ -460,11 +200,11 @@ def save_record(rec: dict):
              rec["disease_progress"], rec["survived"], rec["mistakes"],
              rec["achievements"], rec["created_at"]))
 
-def fetch_my_records(player_name: str):
+def fetch_my_records(player_id: str):
     with db() as c:
         c.row_factory = sqlite3.Row
-        rows = c.execute("SELECT * FROM records WHERE player_name=? ORDER BY id DESC",
-                         (player_name,)).fetchall()
+        rows = c.execute("SELECT * FROM records WHERE player_id=? ORDER BY id DESC",
+                         (player_id,)).fetchall()
     return [dict(r) for r in rows]
 
 def fetch_all_records():
@@ -473,7 +213,55 @@ def fetch_all_records():
         rows = c.execute("SELECT * FROM records ORDER BY id DESC").fetchall()
     return [dict(r) for r in rows]
 
-# ================= 5. 头像 & 消息气泡 =================
+# ================= 6. 页面与状态 =================
+st.set_page_config(page_title="PediMind · 急诊风云", page_icon="🏥", layout="wide")
+
+if "theme" not in st.session_state: st.session_state.theme = "night"
+if "screen" not in st.session_state: st.session_state.screen = "start"
+if "current_case" not in st.session_state: st.session_state.current_case = None
+if "game_mode" not in st.session_state: st.session_state.game_mode = None
+if "player_name" not in st.session_state: st.session_state.player_name = "实习医生"
+if "achievements" not in st.session_state: st.session_state.achievements = []
+if "completed_cases" not in st.session_state: st.session_state.completed_cases = set()
+
+# player_id：URL 持久化
+if "player_id" not in st.session_state:
+    pid = st.query_params.get("pid")
+    if pid and pid.strip():
+        st.session_state.player_id = pid.strip()
+    else:
+        st.session_state.player_id = str(uuid.uuid4())[:8]
+        st.query_params["pid"] = st.session_state.player_id
+
+# 主题 CSS
+if st.session_state.theme == "night":
+    theme_css = """<style>
+        .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
+        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
+        section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; }
+        div[data-testid="stChatInput"] { background-color: #ffffff !important; border-radius: 12px !important; }
+        div[data-testid="stChatInput"] textarea { color: #4a5568 !important; }
+        .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: rgba(0, 180, 216, 0.1) !important; color: #e2e8f0 !important; }
+        .stButton>button:hover { background: rgba(0, 180, 216, 0.3) !important; }
+        .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .case-card { padding: 25px; border-radius: 16px; margin-bottom: 20px; background: rgba(0, 180, 216, 0.05); border: 1px solid rgba(0, 180, 216, 0.3); }
+    </style>"""
+else:
+    theme_css = """<style>
+        .stApp { background-color: #f0f4f8 !important; color: #1a202c !important; }
+        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #1a202c !important; }
+        section[data-testid="stSidebar"] { background-color: #ffffff !important; }
+        .stButton>button { border-radius: 12px !important; border: 1px solid #0077b6 !important; background: #ffffff !important; color: #0077b6 !important; }
+        .status-badge { background: #ffffff; border-radius: 14px; padding: 15px; text-align: center; border: 1px solid #e2e8f0; }
+        .case-card { padding: 25px; border-radius: 16px; margin-bottom: 20px; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    </style>"""
+st.markdown(theme_css, unsafe_allow_html=True)
+
+st.sidebar.markdown("### 🎨 主题设置")
+if st.sidebar.button("☀️ 白天模式" if st.session_state.theme == "night" else "🌙 夜晚模式"):
+    st.session_state.theme = "day" if st.session_state.theme == "night" else "night"; st.rerun()
+
+# ================= 7. 辅助函数 =================
 @st.cache_data(show_spinner=False)
 def load_avatar(path: str) -> str:
     if not os.path.exists(path):
@@ -502,7 +290,7 @@ def render_message(role: str, content: str):
     if role == "user":
         bg = "#95ec69" if not night else "#3eb575"
         fg = "#111111" if not night else "#ffffff"
-        av = avatar_html("doctor.png", "👨‍⚕️", "#4a90d9")
+        av = avatar_html("static/doctor.png", "👨‍⚕️", "#4a90d9")
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-end; align-items:flex-start; margin:8px 0;">
             <div style="background:{bg}; color:{fg}; padding:10px 14px; border-radius:14px;
@@ -515,7 +303,7 @@ def render_message(role: str, content: str):
     else:
         bg = "#ffffff" if not night else "rgba(255,255,255,0.12)"
         fg = "#111111" if not night else "#e2e8f0"
-        av = avatar_html("mom.png", "👩", "#f6a623")
+        av = avatar_html("static/mom.png", "👩", "#f6a623")
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-start; align-items:flex-start; margin:8px 0;">
             <div style="margin-right:8px;">{av}</div>
@@ -526,9 +314,7 @@ def render_message(role: str, content: str):
             </div>
         </div>""", unsafe_allow_html=True)
 
-# ================= 6. 优化版心电监护仪 =================
 def render_monitor(disease_progress: int):
-    # 根据病情度计算生命体征
     if disease_progress < 40:
         hr, spo2, rr, status = 120, 97, 28, "normal"
     elif disease_progress < 70:
@@ -538,227 +324,603 @@ def render_monitor(disease_progress: int):
     else:
         hr, spo2, rr, status = 180, 82, 55, "critical"
 
-    # 报警颜色
-    if status == "normal":
-        hr_color = "#22ff88"
-    elif status == "warn":
-        hr_color = "#ffcc00"
-    else:
-        hr_color = "#ff3b3b"
-
     html_code = f"""
-<div style="width:100%; min-height:340px; background:#000808; border:2px solid #00cc66; border-radius:14px; overflow:hidden; position:relative; box-shadow:0 0 18px rgba(0,255,120,0.25);">
-    <canvas id="ecgCanvas" width="800" height="340" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
-    <div style="position:absolute; top:12px; right:14px; font-family:'Courier New',monospace; background:rgba(0,0,0,0.65); padding:10px 14px; border-radius:10px; z-index:3; border:1px solid rgba(0,255,120,0.3);">
-        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;">HR</div>
-        <div style="font-size:34px;font-weight:bold;color:{hr_color};text-shadow:0 0 10px {hr_color};">{hr}</div>
-        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">SpO₂</div>
-        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{spo2}</div>
-        <div style="font-size:11px;color:#88aaff;letter-spacing:2px;margin-top:8px;">RR</div>
-        <div style="font-size:34px;font-weight:bold;color:#22ff88;text-shadow:0 0 10px #22ff88;">{rr}</div>
-    </div>
-    <div style="position:absolute; left:8px; top:8px; color:#39ff66; font-family:Courier New; font-size:13px; z-index:2;">
-        ECGⅡ<br>PLETH<br>RESP
-    </div>
-</div>
-<script>
-if(window._ecgTimer) clearInterval(window._ecgTimer);
-const canvas = document.getElementById('ecgCanvas');
-if(!canvas) return;
-const ctx = canvas.getContext('2d');
-const W = canvas.width;
-const H = canvas.height;
-const lineGap = H / 3;
-let offset = 0;
-const speed = 0.04;
-const HR = {hr};
-const RR = {rr};
+    <!DOCTYPE html><html><head><style>
+      * {{ margin:0; padding:0; box-sizing:border-box; }}
+      body {{ background:#02060a; overflow:hidden; }}
+      .monitor {{ position:relative; width:100%; height:180px; background:#02060a;
+                 border-radius:10px; border:1px solid #0a3a2a; overflow:hidden; }}
+      canvas {{ display:block; width:100%; height:100%; }}
+      .vitals {{ position:absolute; top:8px; right:12px; text-align:right;
+                font-family:'Courier New',monospace; }}
+      .vital-item {{ margin-bottom:4px; line-height:1.1; text-shadow:0 0 6px currentColor; }}
+      .vital-label {{ font-size:10px; opacity:0.65; letter-spacing:1px; color:#0f0; }}
+      .vital-value {{ font-size:24px; font-weight:bold; }}
+      .vital-unit  {{ font-size:10px; opacity:0.65; }}
+      .c-green {{ color:#22ff88; }} .c-yellow {{ color:#ffcc00; }} .c-red {{ color:#ff3b3b; }}
+      .blink {{ animation:blink 0.6s infinite; }}
+      @keyframes blink {{ 50% {{ opacity:0.25; }} }}
+    </style></head><body>
+      <div class="monitor">
+        <canvas id="ecg"></canvas>
+        <div class="vitals">
+          <div class="vital-item"><div class="vital-label">HR</div><div id="hr" class="vital-value">--</div><div class="vital-unit">bpm</div></div>
+          <div class="vital-item"><div class="vital-label">SpO₂</div><div id="spo2" class="vital-value">--</div><div class="vital-unit">%</div></div>
+          <div class="vital-item"><div class="vital-label">RR</div><div id="rr" class="vital-value">--</div><div class="vital-unit">/min</div></div>
+        </div>
+      </div>
+    <script>
+      const HR={hr}, SPO2={spo2}, RR={rr}, STATUS="{status}";
+      const color = (STATUS==="critical"||STATUS==="danger") ? "#ff3b3b"
+                  : STATUS==="warn" ? "#ffcc00" : "#22ff88";
+      const canvas = document.getElementById('ecg');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      function resize() {{
+        const r = canvas.parentElement.getBoundingClientRect();
+        canvas.width = r.width * devicePixelRatio;
+        canvas.height = r.height * devicePixelRatio;
+        ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+        W = r.width; H = r.height;
+      }}
+      window.addEventListener('resize', resize); resize();
+      function ecgSample(p) {{
+        let v = 0;
+        v += 0.10 * Math.exp(-Math.pow((p-0.16)/0.022, 2));
+        v -= 0.08 * Math.exp(-Math.pow((p-0.245)/0.007, 2));
+        v += 1.00 * Math.exp(-Math.pow((p-0.27)/0.009, 2));
+        v -= 0.16 * Math.exp(-Math.pow((p-0.295)/0.010, 2));
+        v += 0.26 * Math.exp(-Math.pow((p-0.45)/0.040, 2));
+        return v;
+      }}
+      const BUFFER = 400;
+      const data = new Array(BUFFER).fill(0);
+      let phase = 0;
+      const cycleDur = 60 / HR;
+      const sampleInterval = 0.008;
+      const perFrame = 2;
+      const dPhase = (sampleInterval / cycleDur) * perFrame;
+      function drawGrid() {{
+        ctx.lineWidth = 0.5;
+        ctx.strokeStyle = "rgba(0,255,128,0.06)";
+        for (let x=0; x<W; x+=8) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
+        for (let y=0; y<H; y+=8) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
+        ctx.strokeStyle = "rgba(0,255,128,0.12)";
+        for (let x=0; x<W; x+=40) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
+        for (let y=0; y<H; y+=40) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
+      }}
+      function drawWave() {{
+        const step = W / BUFFER, midY = H * 0.62, amp = H * 0.48;
+        ctx.beginPath();
+        ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.shadowBlur = 8; ctx.shadowColor = color;
+        for (let i=0; i<BUFFER; i++) {{
+          const x = i*step, y = midY - data[i]*amp;
+          i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        }}
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }}
+      function loop() {{
+        for (let k=0; k<perFrame; k++) {{
+          phase = (phase + dPhase) % 1;
+          let v = ecgSample(phase);
+          if (STATUS==="danger"||STATUS==="critical") v += (Math.random()-0.5)*0.08;
+          data.push(v); data.shift();
+        }}
+        ctx.clearRect(0,0,W,H);
+        drawGrid(); drawWave();
+        requestAnimationFrame(loop);
+      }}
+      requestAnimationFrame(loop);
+      function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
+      function updateVitals() {{
+        const cls = (STATUS==="critical"||STATUS==="danger") ? "vital-value c-red blink"
+                  : STATUS==="warn" ? "vital-value c-yellow" : "vital-value c-green";
+        const hrEl=document.getElementById('hr'), spEl=document.getElementById('spo2'), rrEl=document.getElementById('rr');
+        hrEl.textContent = jit(HR,4); spEl.textContent = jit(SPO2,1); rrEl.textContent = jit(RR,1);
+        [hrEl,spEl,rrEl].forEach(e=>e.className=cls);
+      }}
+      updateVitals(); setInterval(updateVitals, 1200);
+    </script></body></html>
+    """
+    components.html(html_code, height=190, scrolling=False)
 
-// ECG QRS波形
-function getEcgVal(t) {{
-    const cycle = 60 / HR;
-    const p = (t % cycle) / cycle;
-    let v = 0;
-    if(p>0.02 && p<0.12) v += 0.18 * Math.exp(-Math.pow((p-0.07)/0.025,2));
-    if(p>0.14 && p<0.18) v -= 0.22 * Math.exp(-Math.pow((p-0.16)/0.008,2));
-    if(p>0.18 && p<0.23) v += 1.25 * Math.exp(-Math.pow((p-0.205)/0.007,2));
-    if(p>0.23 && p<0.28) v -= 0.30 * Math.exp(-Math.pow((p-0.25)/0.012,2));
-    if(p>0.32 && p<0.55) v += 0.32 * Math.exp(-Math.pow((p-0.42)/0.045,2));
-    return v;
-}}
-// 血氧容积波
-function getPlethVal(t) {{
-    return 0.4 * Math.sin(2 * Math.PI * (HR/60) * t);
-}}
-// 呼吸波
-function getRespVal(t) {{
-    return 0.4 * Math.sin(2 * Math.PI * (RR/60) * t);
-}}
+def _try_unlock(key: str):
+    if key not in st.session_state.achievements:
+        st.session_state.achievements.append(key)
 
-function drawGrid() {{
-    ctx.fillStyle="#000808";
-    ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle="rgba(0,120,60,0.18)";
-    ctx.lineWidth=0.5;
-    for(let x=0;x<W;x+=24){{ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}}
-    for(let y=0;y<H;y+=24){{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
-    ctx.strokeStyle="rgba(0,200,100,0.35)";
-    ctx.lineWidth=0.8;
-    for(let x=0;x<W;x+=120){{ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(W,y);ctx.stroke();}}
-    for(let y=0;y<H;y+=120){{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
-}}
-
-function drawWave() {{
-    // 通道1 ECG
-    ctx.beginPath();
-    ctx.strokeStyle="#22ff88";
-    ctx.lineWidth=2.2;
-    ctx.shadowColor="#22ff88";
-    ctx.shadowBlur=8;
-    const y0 = lineGap * 0.5;
-    for(let x=0;x<W;x++){{
-        const t = (x * 0.0025) + offset;
-        const val = getEcgVal(t);
-        const y = y0 - val * lineGap * 0.35;
-        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }}
-    ctx.stroke();
-
-    // 通道2 PLETH
-    ctx.beginPath();
-    ctx.strokeStyle="#22ff88";
-    ctx.lineWidth=1.8;
-    ctx.shadowBlur=6;
-    const y1 = lineGap * 1.5;
-    for(let x=0;x<W;x++){{
-        const t = (x * 0.0025) + offset;
-        const val = getPlethVal(t);
-        const y = y1 - val * lineGap * 0.35;
-        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }}
-    ctx.stroke();
-
-    // 通道3 RESP
-    ctx.beginPath();
-    ctx.strokeStyle="#22ff88";
-    ctx.lineWidth=1.8;
-    ctx.shadowBlur=6;
-    const y2 = lineGap * 2.5;
-    for(let x=0;x<W;x++){{
-        const t = (x * 0.0025) + offset;
-        const val = getRespVal(t);
-        const y = y2 - val * lineGap * 0.35;
-        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }}
-    ctx.stroke();
-    ctx.shadowBlur=0;
-}}
-
-function render() {{
-    drawGrid();
-    drawWave();
-    offset += speed;
-}}
-render();
-window._ecgTimer = setInterval(render, 35);
-</script>
-"""
-    components.html(html_code, height=360, scrolling=False)
-# ================= 新增：病情进度夹紧工具函数 =================
-def adjust_disease_progress(delta:int):
+def check_achievements(case, case_id: str):
     ss = st.session_state
-    ss.disease_progress = max(0, min(100, ss.disease_progress + delta))
-# ================= 7. 页面状态与路由 =================
-st.set_page_config(page_title="PediMind · 急诊风云", page_icon="🏥", layout="wide")
-if "theme" not in st.session_state: st.session_state.theme = "night"
-if "screen" not in st.session_state: st.session_state.screen = "start"
-if "current_case" not in st.session_state: st.session_state.current_case = None
-if "game_mode" not in st.session_state: st.session_state.game_mode = None
-if "player_id" not in st.session_state: st.session_state.player_id = str(uuid.uuid4())[:8]
-if "player_name" not in st.session_state: st.session_state.player_name = "实习医生"
-if "achievements" not in st.session_state: st.session_state.achievements = []
+    if getattr(ss, "game_over", False) and getattr(ss, "disease_progress", 100) < 100:
+        ss.completed_cases.add(case_id)
+    for aid, a in GLOBAL_ACHIEVEMENTS.items():
+        try:
+            if a["check"](ss, case): _try_unlock(f"global:{aid}")
+        except Exception: pass
+    for aid, a in CASE_ACHIEVEMENTS.get(case_id, {}).items():
+        try:
+            if a["check"](ss, case): _try_unlock(f"{case_id}:{aid}")
+        except Exception: pass
 
-if st.session_state.theme == "night":
-    theme_css = """<style>
-        .stApp { background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }
-        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #e2e8f0 !important; }
-        section[data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; }
-        div[data-testid="stChatMessage"] { background-color: rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; margin-bottom: 10px; }
-        div[data-testid="stChatInput"] { background-color: #ffffff !important; border-radius: 12px !important; }
-        div[data-testid="stChatInput"] textarea { color: #4a5568 !important; }
-        .stButton>button { border-radius: 12px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: rgba(0, 180, 216, 0.1) !important; color: #e2e8f0 !important; }
-        .stButton>button:hover { background: rgba(0, 180, 216, 0.3) !important; }
-        .status-badge { background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
-        .case-card { padding: 25px; border-radius: 16px; margin-bottom: 20px; background: rgba(0, 180, 216, 0.05); border: 1px solid rgba(0, 180, 216, 0.3); }
-        .case-card:hover { transform: translateY(-5px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-        
-        /* 修复提示框内部文字对比度 */
-        div[data-testid="stAlert"] * {
-            color: #1a202c !important;
-        }
-    </style>"""
-else:
-    theme_css = """<style>
-        .stApp { background-color: #f0f4f8 !important; color: #1a202c !important; }
-        p, span, div, label, h1, h2, h3, h4, h5, h6 { color: #1a202c !important; }
-        section[data-testid="stSidebar"] { background-color: #ffffff !important; }
-        div[data-testid="stChatMessage"] { background-color: #ffffff !important; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px; }
-        .stButton>button { border-radius: 12px !important; border: 1px solid #0077b6 !important; background: #ffffff !important; color: #0077b6 !important; }
-        .status-badge { background: #ffffff; border-radius: 14px; padding: 15px; text-align: center; border: 1px solid #e2e8f0; }
-        .case-card { padding: 25px; border-radius: 16px; margin-bottom: 20px; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    </style>"""
-st.markdown(theme_css, unsafe_allow_html=True)
+def achievement_total() -> int:
+    return len(flatten_achievements())
 
-# ================= 8. 界面渲染 =================
-# 屏幕 1：开始界面
-# ===================== 页面路由逻辑 =====================
+def achievement_unlocked_count() -> int:
+    return len(st.session_state.get("achievements", []))
+
+def render_achievement_grid(ach_dict: dict, prefix: str, cols_per_row: int = 2):
+    unlocked = st.session_state.get("achievements", [])
+    items = list(ach_dict.items())
+    cols = st.columns(cols_per_row)
+    for i, (aid, a) in enumerate(items):
+        key = f"{prefix}:{aid}"
+        done = key in unlocked
+        with cols[i % cols_per_row]:
+            icon_style = "" if done else "filter:grayscale(1) opacity(0.35);"
+            bg     = "rgba(0,180,216,0.12)" if done else "rgba(128,128,128,0.08)"
+            border = "#00b4d8" if done else "rgba(150,150,150,0.35)"
+            name_c = "#00b4d8" if done else "#8a94a6"
+            desc_c = "#cbd5e1" if done else "#6b7280"
+            badge  = "✅ 已解锁" if done else "🔒 未解锁"
+            st.markdown(f"""
+            <div style="background:{bg}; border:1px solid {border}; border-radius:14px;
+                        padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:12px;">
+                <div style="font-size:34px; {icon_style}">{a['icon']}</div>
+                <div style="flex:1;">
+                    <div style="font-weight:800; font-size:15px; color:{name_c};">{a['name']}</div>
+                    <div style="font-size:12px; color:{desc_c}; margin-top:2px;">{html.escape(a['desc'])}</div>
+                    <div style="font-size:11px; color:{name_c}; margin-top:4px;">{badge}</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+def render_sidebar_achievements(case_id: str):
+    st.sidebar.markdown("### 🏅 成就进度")
+    total = achievement_total()
+    got = achievement_unlocked_count()
+    st.sidebar.progress(min(1.0, got / total) if total else 0)
+    st.sidebar.caption(f"已解锁 **{got} / {total}**")
+    if case_id in CASE_ACHIEVEMENTS:
+        st.sidebar.caption("本病例成就：")
+        cols = st.sidebar.columns(4)
+        unlocked = st.session_state.get("achievements", [])
+        for i, (aid, a) in enumerate(CASE_ACHIEVEMENTS[case_id].items()):
+            done = f"{case_id}:{aid}" in unlocked
+            style = "" if done else "filter:grayscale(1) opacity(0.35);"
+            cols[i].markdown(
+                f'<div title="{html.escape(a["name"])}：{html.escape(a["desc"])}" '
+                f'style="text-align:center; font-size:24px; {style}">{a["icon"]}</div>',
+                unsafe_allow_html=True)
+
+# ================= 8. 开始界面 =================
 if st.session_state.screen == "start":
-    # 【start 首页：昵称输入页，修复后的版本，无widget冲突】
-    st.markdown("# 🩺 PediMind · 急诊风云")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 72px; font-weight: 900; color: #00b4d8; margin-top: 80px; letter-spacing: 5px;">🏥 PediMind</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 38px; font-weight: 700; color: #e63946; margin-bottom: 30px; letter-spacing: 5px;">急诊风云</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; max-width: 600px; margin: 0 auto 50px auto; line-height: 2; font-size: 16px;">
+        <span style="color: #00b4d8; font-weight: bold;">欢迎来到 PediMind 儿科急诊模拟器。</span><br>
+        在这里，你是一名急诊科医生。<br>面对各种凶险的儿科急症，你的每一次决策，都将决定患儿的生死。
+    </div>
+    """, unsafe_allow_html=True)
     _, col_mid, _ = st.columns([1, 1, 1])
     with col_mid:
-        name_input = st.text_input(
-            "👨‍⚕️ 你的昵称（用于记录错题本，输入相同昵称可查看历史）",
-            max_chars=12
-        )
+        st.text_input("👨‍⚕️ 你的昵称", key="player_name", max_chars=12)
+        st.caption(f"专属 ID：`{st.session_state.player_id}`（收藏链接即可跨设备恢复）")
         if st.button("🚀 开始游戏", use_container_width=True, type="primary"):
-            if name_input.strip() == "":
-                st.warning("请输入昵称！")
-            else:
-                st.session_state.player_name = name_input.strip()
-                st.session_state.screen = "select_case"
-                st.rerun()
+            st.session_state.screen = "case_select"; st.rerun()
+        c1, c2 = st.columns(2)
+        if c1.button("📕 我的错题本", use_container_width=True):
+            st.session_state.screen = "profile"; st.rerun()
+        if c2.button("📊 全服统计", use_container_width=True):
+            st.session_state.screen = "stats"; st.rerun()
+        if st.button("🏅 成就殿堂", use_container_width=True):
+            st.session_state.screen = "achievements"; st.rerun()
+        with st.expander("🔑 换设备？输入之前的专属 ID 恢复错题本"):
+            recover = st.text_input("专属 ID", max_chars=8, key="recover_id")
+            if st.button("恢复", key="recover_btn") and recover.strip():
+                new_id = recover.strip()
+                st.session_state.player_id = new_id
+                st.query_params["pid"] = new_id
+                st.success(f"✅ 已切换到 ID：`{new_id}`"); st.rerun()
+    st.stop()
 
-elif st.session_state.screen == "select_case":
-    # 病例选择页
-    st.markdown(f"## 欢迎你，{st.session_state.player_name}！")
-    st.markdown("### 📋 请选择一个病例开始答题")
-    st.markdown("<br>", unsafe_allow_html=True)
+# ================= 9. 病例选择 =================
+if st.session_state.screen == "case_select":
+    st.markdown('<div style="text-align: center; font-size: 42px; font-weight: 900; color: #00b4d8; margin-top: 30px; margin-bottom: 30px;">📋 选择病例</div>', unsafe_allow_html=True)
+    for case_id, case in CASES_CONFIG.items():
+        cols = st.columns([3, 1])
+        with cols[0]:
+            st.markdown(f"""
+            <div class="case-card">
+                <div style="font-size: 24px; font-weight: bold; color: #00b4d8; margin-bottom: 10px;">📁 {case['name']} ({case['disease']})</div>
+                <div style="font-size: 14px; margin-bottom: 5px;"><b>患儿：</b>{case['patient']}</div>
+                <div style="font-size: 14px; color: #e63946; margin-bottom: 5px;"><b>难度：</b>{case['difficulty']}</div>
+                <div style="font-size: 13px; font-style: italic; margin-top: 10px;">{case['description']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with cols[1]:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            if st.button("▶️ 进入病例", key=f"select_{case_id}", use_container_width=True, type="primary"):
+                st.session_state.current_case = case_id
+                st.session_state.screen = "difficulty_select"; st.rerun()
+    if st.button("⬅️ 返回主菜单"): st.session_state.screen = "start"; st.rerun()
+    st.stop()
 
-    case_list = [
-        "病例1：急性阑尾炎",
-        "病例2：社区获得性肺炎",
-        "病例3：急性心梗",
-        "病例4：糖尿病酮症酸中毒"
-    ]
-    selected_case = st.radio("选择病例：", case_list)
-
-    col1, col2 = st.columns(2)
+# ================= 10. 难度选择 =================
+if st.session_state.screen == "difficulty_select":
+    case = CASES_CONFIG[st.session_state.current_case]
+    st.markdown('<div style="text-align: center; font-size: 42px; font-weight: 900; color: #00b4d8; margin-top: 30px;">⚙️ 选择难度</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2, gap="large")
     with col1:
-        if st.button("✅ 进入病例", use_container_width=True, type="primary"):
-            st.session_state.current_case = selected_case
-            st.session_state.screen = "quiz"
-            st.rerun()
+        st.info("🌱 **简单模式**\n- 5个行动点\n- 初始信任值40\n- 有详细提示和引导")
+        if st.button("开始简单模式", use_container_width=True):
+            st.session_state.game_mode = "easy"; st.session_state.screen = "game"; st.rerun()
     with col2:
-        if st.button("🔙 返回首页", use_container_width=True):
-            st.session_state.screen = "start"
-            st.rerun()
+        st.warning("🔥 **困难模式**\n- 3个行动点\n- 初始信任值20\n- 无提示，盲盒线索")
+        if st.button("开始困难模式", use_container_width=True):
+            st.session_state.game_mode = "hard"; st.session_state.screen = "game"; st.rerun()
+    if st.button("⬅️ 返回病例选择"): st.session_state.screen = "case_select"; st.rerun()
+    st.stop()
 
-elif st.session_state.screen == "quiz":
-    # 答题页面占位
-    st.markdown(f"## 📖 {st.session_state.current_case}")
-    st.info("这里是答题页面，后续可以写题干、选项、判分逻辑")
-    if st.button("🔙 返回病例选择"):
-        st.session_state.screen = "select_case"
-        st.rerun()
+# ================= 11. 成就殿堂 =================
+if st.session_state.screen == "achievements":
+    st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">🏅 成就殿堂</div>', unsafe_allow_html=True)
+    total = achievement_total()
+    got = achievement_unlocked_count()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("成就总数", total)
+    c2.metric("已解锁", got)
+    c3.metric("完成度", f"{(got/total*100 if total else 0):.0f}%")
+    st.progress(min(1.0, got / total) if total else 0)
+    st.divider()
+
+    tab_names = ["🌐 通用成就"] + [f"📁 {CASES_CONFIG[cid]['disease']}" for cid in CASES_CONFIG]
+    tabs = st.tabs(tab_names)
+    with tabs[0]:
+        st.caption("所有病例共享的通用成就")
+        render_achievement_grid(GLOBAL_ACHIEVEMENTS, "global")
+    for i, cid in enumerate(CASES_CONFIG, start=1):
+        with tabs[i]:
+            case = CASES_CONFIG[cid]
+            st.caption(f"**{case['name']}** · {case['disease']} · {case['difficulty']}")
+            render_achievement_grid(CASE_ACHIEVEMENTS.get(cid, {}), cid)
+
+    if st.button("⬅️ 返回主菜单"):
+        st.session_state.screen = "start"; st.rerun()
+    st.stop()
+
+# ================= 12. 错题本 =================
+if st.session_state.screen == "profile":
+    st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">📕 我的错题本</div>', unsafe_allow_html=True)
+    st.caption(f"👨‍⚕️ 当前玩家：**{st.session_state.player_name}**　｜ 专属 ID：`{st.session_state.player_id}`")
+    records = fetch_my_records(st.session_state.player_id)
+    if not records:
+        st.info("还没有记录。完成一局游戏后，这里会自动收录你的失误与得分。")
+    else:
+        df = pd.DataFrame(records)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("总场次", len(df))
+        c2.metric("平均分", f"{df['final_score'].mean():.1f}")
+        c3.metric("存活率", f"{df['survived'].mean()*100:.0f}%")
+        st.subheader("📈 得分趋势")
+        fig = px.line(df.iloc[::-1], x="created_at", y="final_score", markers=True, color="case_name")
+        fig.update_layout(height=280, margin=dict(l=10, r=10, t=20, b=10))
+        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("🗂️ 历史记录")
+        for r in records:
+            mistakes = json.loads(r["mistakes"] or "[]")
+            with st.expander(f"{'✅' if r['survived'] else '💀'} {r['created_at']} | {r['disease']} | 得分 {r['final_score']}"):
+                a, b = st.columns(2)
+                a.write(f"**难度**：{r['mode']}\n\n**病情度**：{r['disease_progress']}\n\n"
+                        f"**问诊/诊断/急救/沟通**：{r['score_inquiry']}/{r['score_diagnosis']}/{r['score_emergency']}/{r['score_empathy']}")
+                with b:
+                    if mistakes: st.warning("**失误记录：**\n" + "\n".join(f"- {m}" for m in mistakes))
+                    else: st.success("本局无失误 🎉")
+    if st.button("⬅️ 返回主菜单"):
+        st.session_state.screen = "start"; st.rerun()
+    st.stop()
+
+# ================= 13. 全服统计 =================
+if st.session_state.screen == "stats":
+    st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">📊 全服游玩统计</div>', unsafe_allow_html=True)
+    all_recs = fetch_all_records()
+    if not all_recs:
+        st.info("暂无任何玩家数据。")
+    else:
+        df = pd.DataFrame(all_recs)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("总游玩场次", len(df))
+        c2.metric("独立玩家数", df["player_id"].nunique())
+        c3.metric("全服平均分", f"{df['final_score'].mean():.1f}")
+        st.subheader("🏥 各病例表现")
+        agg = df.groupby("disease").agg(
+            场次=("id", "count"), 平均分=("final_score", "mean"),
+            最高分=("final_score", "max"), 存活率=("survived", "mean")).reset_index()
+        agg["平均分"] = agg["平均分"].round(1)
+        agg["存活率"] = (agg["存活率"] * 100).round(0).astype(int).astype(str) + "%"
+        st.dataframe(agg, use_container_width=True, hide_index=True)
+        st.subheader("📊 各病例平均分对比")
+        fig2 = px.bar(agg, x="disease", y="平均分", color="平均分", color_continuous_scale="Teal", text="平均分")
+        fig2.update_layout(height=300, margin=dict(l=10, r=10, t=20, b=10))
+        st.plotly_chart(fig2, use_container_width=True)
+        st.subheader("🏅 成就解锁率（Top 10）")
+        flat = flatten_achievements()
+        total_rec = len(df)
+        ach_stats = []
+        for key, a in flat.items():
+            cnt = sum(1 for x in df["achievements"] if key in json.loads(x or "[]"))
+            if cnt > 0:
+                ach_stats.append({"成就": f"{a['icon']} {a['name']}",
+                                  "解锁率": f"{cnt/total_rec*100:.0f}%", "解锁人数": cnt})
+        ach_stats.sort(key=lambda r: r["解锁人数"], reverse=True)
+        st.dataframe(pd.DataFrame(ach_stats[:10]), use_container_width=True, hide_index=True)
+    if st.button("⬅️ 返回主菜单"):
+        st.session_state.screen = "start"; st.rerun()
+    st.stop()
+
+# ================= 14. 游戏主逻辑 =================
+if st.session_state.screen == "game":
+    case = CASES_CONFIG[st.session_state.current_case]
+    mode = st.session_state.game_mode
+
+    defaults = {
+        "messages": [{"role": "assistant", "content": f"医生！您快看看我家孩子！{case['description']}"}],
+        "trust_score": 40 if mode == "easy" else 20,
+        "action_points": 5 if mode == "easy" else 3,
+        "disease_progress": 30,
+        "game_over": False, "time_period": 1, "unlocked_clues": [],
+        "penalty_log": [], "crisis_correct_count": 0,
+        "final_score": 0, "final_title": "",
+        "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
+        "diagnosis_made": None, "diagnosis_processed": False,
+        "auscultation_mode": False, "auscultation_completed": False,
+        "physical_exam_done": {}, "comm_made": False,
+        "crisis_start_time": time.time(), "record_saved": False,
+        "intro_video_played": False
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state: st.session_state[k] = v
+
+    check_achievements(case, st.session_state.current_case)
+
+    SCENARIO_DATA = {
+        1: {"title": "🎬 第一幕：急诊室初遇", "mode": "free"},
+        2: {"title": "🎬 第二幕：初步判断", "mode": "decision"},
+        3: {"title": "🎬 第三幕：迷雾重重", "mode": "free"},
+        4: {"title": "🎬 第四幕：生死时速", "mode": "crisis"},
+        5: {"title": "🎬 第五幕：医患沟通", "mode": "communication"},
+        6: {"title": "🎬 第六幕：结案复盘", "mode": "end"}
+    }
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption(f"当前病例：{case['disease']}")
+    if st.sidebar.button("🏠 返回主菜单"):
+        for key in list(st.session_state.keys()):
+            if key not in ["theme", "player_id", "player_name", "achievements", "completed_cases"]:
+                del st.session_state[key]
+        st.session_state.screen = "start"; st.rerun()
+    render_sidebar_achievements(st.session_state.current_case)
+
+    # 开场视频
+    if st.session_state.time_period == 1 and not st.session_state.intro_video_played:
+        st.subheader("🎬 急诊室画面")
+        if os.path.exists("static/intro_er.mp4"):
+            st.video("static/intro_er.mp4", autoplay=True, muted=True)
+        else:
+            st.info("（此处为开场视频：深夜急诊，一位母亲抱着孩子冲进抢救室…）")
+        if st.button("⏭️ 跳过开场"):
+            st.session_state.intro_video_played = True; st.rerun()
+        st.session_state.intro_video_played = True
+
+    st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
+
+    col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
+
+    with col_left:
+        st.subheader("📈 生命体征")
+        dp = st.session_state.disease_progress
+        render_monitor(dp)
+        if dp < 40: st.caption("🧠 意识：轻度烦躁")
+        elif dp < 70: st.caption("🧠 意识：明显烦躁")
+        elif dp < 90: st.caption("🧠 意识：发绀、烦躁")
+        else: st.caption("🧠 意识：意识模糊")
+        st.divider()
+        if not st.session_state.game_over:
+            if st.session_state.time_period in [1, 3]:
+                if st.session_state.time_period == 3 and st.session_state.action_points <= 2 and not st.session_state.diagnosis_processed:
+                    st.warning("⚠️ 请给出初步诊断：")
+                    for opt_key, opt_val in case["diagnosis"].items():
+                        if st.button(opt_val, key=f"diag_{opt_key}", use_container_width=True):
+                            st.session_state.diagnosis_processed = True
+                            st.session_state.diagnosis_made = opt_key
+                            if opt_val == case["disease"]:
+                                st.session_state.score_diagnosis += 15
+                                st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！这是{case['disease']}。"})
+                            else:
+                                st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
+                                st.session_state.penalty_log.append(f"误诊为{opt_val}")
+                                st.session_state.messages.append({"role": "assistant", "content": "❌ 误诊！病情加重。"})
+                            st.rerun()
+                elif st.session_state.action_points <= 2 and (st.session_state.time_period == 1 or st.session_state.diagnosis_processed):
+                    if st.button("▶️ 进入下一幕", use_container_width=True):
+                        st.session_state.time_period += 1
+                        st.session_state.action_points = 3 if st.session_state.time_period == 4 else 5
+                        st.session_state.disease_progress += 10; st.rerun()
+                elif st.session_state.action_points > 2:
+                    st.caption(f"💡 强制问诊：还需 {st.session_state.action_points - 2} 次")
+            if st.session_state.time_period == 3 and st.session_state.diagnosis_processed and st.session_state.action_points <= 2:
+                if st.button("🚨 突发事件！进入第四幕", use_container_width=True):
+                    st.session_state.time_period = 4; st.session_state.action_points = 3
+                    st.session_state.disease_progress = max(70, st.session_state.disease_progress + 15)
+                    st.session_state.crisis_start_time = time.time()
+                    st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重）医生！救救她！"}); st.rerun()
+            if st.session_state.time_period == 4 and st.session_state.crisis_correct_count >= 2:
+                if st.button("✅ 进入第五幕", use_container_width=True):
+                    st.session_state.score_emergency += 20; st.session_state.time_period = 5
+                    st.session_state.action_points = 5
+                    st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸平稳）"}); st.rerun()
+            if st.session_state.time_period == 5 and not st.session_state.comm_made:
+                st.warning("⚠️ 交代病情：")
+                if st.button("A. 赶紧办住院", key="c_a"):
+                    st.session_state.comm_made = True; st.session_state.trust_score -= 10; st.rerun()
+                if st.button("B. 病情很重，可能窒息", key="c_b"):
+                    st.session_state.comm_made = True; st.session_state.trust_score -= 5; st.rerun()
+                if st.button("C. 您别自责，送来及时，我们会尽力", key="c_c"):
+                    st.session_state.comm_made = True; st.session_state.trust_score += 15
+                    st.session_state.score_empathy += 15; st.rerun()
+            if st.session_state.time_period == 5 and st.session_state.comm_made:
+                if st.button("▶️ 进入复盘", use_container_width=True):
+                    st.session_state.time_period = 6; st.rerun()
+        st.divider()
+        if st.session_state.time_period >= 5 and not st.session_state.game_over:
+            if st.button("📝 提交诊断，结束", use_container_width=True):
+                st.session_state.game_over = True; st.rerun()
+        if st.button("🔄 重新开始", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                if key not in ["theme", "screen", "current_case", "game_mode",
+                               "player_id", "player_name", "achievements", "completed_cases"]:
+                    del st.session_state[key]
+            st.session_state.screen = "start"; st.rerun()
+
+    with col_right:
+        st.subheader("🔍 线索夹")
+        if mode == "hard":
+            for i, clue in enumerate(case["clues"]):
+                if clue in st.session_state.unlocked_clues: st.success(f"✅ {clue}")
+                else: st.text(f"🔒 未知线索 {i+1}/{len(case['clues'])}")
+        else:
+            for clue in case["clues"]:
+                if clue in st.session_state.unlocked_clues: st.success(f"✅ {clue}")
+                else: st.text("🔒 未知线索")
+        if st.session_state.penalty_log:
+            st.divider(); st.caption("📝 失误记录")
+            for log in st.session_state.penalty_log: st.warning(log)
+
+    with col_center:
+        if not st.session_state.game_over:
+            st.title(SCENARIO_DATA[st.session_state.time_period]["title"])
+            if st.session_state.time_period == 1: st.info("任务：安抚情绪，了解发病时间和特征。")
+        else: st.title("🏥 结案复盘")
+
+        if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
+            with st.expander("🩺 体格检查工具箱（消耗行动点）", expanded=False):
+                tab1, tab2, tab3 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊/叩诊"])
+                with tab1:
+                    if st.button("观察呼吸/查体"):
+                        if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("vis"):
+                            st.session_state.action_points -= 1
+                            st.session_state.physical_exam_done["vis"] = True
+                            st.session_state.unlocked_clues.append("三凹征" if "三凹征" in case["clues"] else case["clues"][0])
+                            st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                            st.session_state.messages.append({"role": "assistant", "content": "（你观察到患儿呼吸急促，相关体征阳性。）"}); st.rerun()
+                with tab2:
+                    if st.button("进行听诊"):
+                        if st.session_state.action_points > 0 and not st.session_state.auscultation_completed:
+                            st.session_state.action_points -= 1
+                            st.session_state.auscultation_mode = True; st.rerun()
+
+        if st.session_state.auscultation_mode:
+            st.warning("🩺 听诊音频：")
+            if os.path.exists(f"static/{case['audio']}"): st.audio(f"static/{case['audio']}", format="audio/mp3")
+            st.write("请判断：")
+            if st.button("吸气性喉鸣 (Stridor)"):
+                if case["disease"] in ("急性感染性喉炎", "急性会厌炎"):
+                    st.session_state.unlocked_clues.append("吸气性喉鸣")
+                    st.session_state.score_diagnosis += 10
+                st.session_state.auscultation_mode = False
+                st.session_state.auscultation_completed = True; st.rerun()
+            if st.button("呼气性哮鸣音 (Wheezing)"):
+                if case["disease"] == "支气管哮喘急性发作":
+                    st.session_state.unlocked_clues.append("双肺哮鸣音")
+                    st.session_state.score_diagnosis += 10
+                st.session_state.auscultation_mode = False
+                st.session_state.auscultation_completed = True; st.rerun()
+        else:
+            with st.container(height=400):
+                for msg in st.session_state.messages:
+                    render_message(msg["role"], msg["content"])
+
+            if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
+                elapsed = time.time() - st.session_state.crisis_start_time
+                time_left = max(0, 90 - int(elapsed))
+                st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
+                if time_left <= 0:
+                    st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
+                if st.session_state.action_points > 0:
+                    for opt_key, opt_val in case["crisis"].items():
+                        if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
+                            st.session_state.action_points -= 1
+                            st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
+                            st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
+                            st.session_state.disease_progress += opt_val["disease"]
+                            if opt_val["type"] == "correct": st.session_state.crisis_correct_count += 1
+                            else: st.session_state.penalty_log.append(opt_val["label"])
+                            if st.session_state.disease_progress >= 100: st.session_state.game_over = True
+                            st.rerun()
+
+            elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
+                if prompt := st.chat_input("输入问诊或检查..."):
+                    if st.session_state.action_points <= 0:
+                        st.warning("行动点已用完，请进入下一幕。")
+                    else:
+                        st.session_state.action_points -= 1
+                        st.session_state.messages.append({"role": "user", "content": prompt})
+                        for clue in case["clues"]:
+                            if clue in prompt or (clue == "犬吠样咳嗽" and "小狗" in prompt) or (clue == "进食呛咳史" and "花生" in prompt):
+                                if clue not in st.session_state.unlocked_clues:
+                                    st.session_state.unlocked_clues.append(clue)
+                                    st.session_state.score_inquiry += 8
+                                    st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                        st.session_state.messages.append({"role": "assistant", "content": f"医生，我真的好担心，求您快帮帮孩子吧！（提示：已获取线索 {len(st.session_state.unlocked_clues)}/{len(case['clues'])}）"}); st.rerun()
+
+    if st.session_state.game_over:
+        st.divider(); st.header("🩺 带教老师复盘")
+        if st.session_state.final_score == 0:
+            total = (st.session_state.score_inquiry + st.session_state.score_diagnosis
+                     + st.session_state.score_emergency + st.session_state.score_empathy)
+            st.session_state.final_score = total
+            if total >= 80: st.session_state.final_title = "🏆 儿科急诊之光"
+            elif total >= 60: st.session_state.final_title = "🌟 有潜力的住院医"
+            else: st.session_state.final_title = "📚 还需回炉重造"
+
+        if not st.session_state.record_saved:
+            check_achievements(case, st.session_state.current_case)
+            save_record({
+                "player_id": st.session_state.player_id,
+                "player_name": st.session_state.player_name,
+                "case_id": st.session_state.current_case,
+                "case_name": case["name"],
+                "disease": case["disease"],
+                "mode": st.session_state.game_mode,
+                "final_score": st.session_state.final_score,
+                "score_inquiry": st.session_state.score_inquiry,
+                "score_diagnosis": st.session_state.score_diagnosis,
+                "score_emergency": st.session_state.score_emergency,
+                "score_empathy": st.session_state.score_empathy,
+                "disease_progress": st.session_state.disease_progress,
+                "survived": 1 if st.session_state.disease_progress < 100 else 0,
+                "mistakes": json.dumps(st.session_state.penalty_log, ensure_ascii=False),
+                "achievements": json.dumps(st.session_state.achievements, ensure_ascii=False),
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            })
+            st.session_state.record_saved = True
+
+        st.info(f"### {st.session_state.final_title}\n最终得分：{st.session_state.final_score} / 100")
+        st.subheader("📊 个人能力雷达图")
+        fig = go.Figure(go.Scatterpolar(
+            r=[min(100, st.session_state.score_inquiry * 3),
+               min(100, st.session_state.score_diagnosis * 2),
+               min(100, st.session_state.score_emergency * 2),
+               min(100, st.session_state.score_empathy * 2)],
+            theta=['问诊', '诊断', '急救', '沟通'], fill='toself'))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("🏅 成就总览")
+        st.caption(f"已解锁 **{achievement_unlocked_count()} / {achievement_total()}** · 详情请到「成就殿堂」查看")
+        render_sidebar_achievements(st.session_state.current_case)
+
+        if st.button("🏠 返回主菜单"):
+            for key in list(st.session_state.keys()):
+                if key not in ["theme", "player_id", "player_name", "achievements", "completed_cases"]:
+                    del st.session_state[key]
+            st.session_state.screen = "start"; st.rerun()
