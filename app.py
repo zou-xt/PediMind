@@ -655,10 +655,10 @@ if st.session_state.screen == "intro":
     with col_mid:
         st.markdown('<div style="text-align: center; font-size: 36px; font-weight: 900; color: #e63946; margin-top: 30px; margin-bottom: 20px;">🎬 急诊室画面</div>', unsafe_allow_html=True)
         
-        if os.path.exists("static/intro_er.mp4"):
-            st.video("static/intro_er.mp4", autoplay=True, muted=True)
+        if os.path.exists("intro_er.mp4"):
+            st.video("intro_er.mp4", autoplay=True, muted=True)
         else:
-            st.info("（此处缺少开场视频文件 static/intro_er.mp4，点击下方按钮直接进入）")
+            st.info("（此处缺少开场视频文件 intro_er.mp4，点击下方按钮直接进入）")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -903,7 +903,7 @@ if st.session_state.screen == "game":
                             if st.session_state.current_case == "laryngitis":
                                 st.session_state.unlocked_clues.append("三凹征")
                                 # 插入三凹征视频标记
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:static/three_depressions.mp4]"})
+                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:three_depressions.mp4]"})
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.unlocked_clues.append("面色发绀")
                                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿面色口唇发绀，剧烈咳嗽，双手抓喉。）"})
