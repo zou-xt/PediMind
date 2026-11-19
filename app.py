@@ -552,4 +552,16 @@ if st.session_state.screen == "game":
         "trust_score": 40 if mode == "easy" else 20,
         "action_points": 5 if mode == "easy" else 3,
         "disease_progress": 30, "game_over": False, "time_period": 1, "unlocked_clues": [],
-        "penalty_log": [], "crisis_correct_count": 0, "final_score": 0, "final_title
+        "penalty_log": [], "crisis_correct_count": 0, "final_score": 0, "final_title": "",
+        "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
+        "diagnosis_made": None, "diagnosis_processed": False,
+        "auscultation_mode": False, "auscultation_completed": False,
+        "visual_exam_mode": False, "visual_exam_answered": False,
+        "physical_exam_done": {}, "comm_made": False,
+        "call_senior_used": False, "senior_mode": False,
+        "crisis_start_time": time.time(), "record_saved": False,
+        
+        # 下面这两个是新增的 AI 复盘和证书状态，确保不要漏掉
+        "ai_review": None, 
+        "ai_review_generated": False
+    }
