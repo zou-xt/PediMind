@@ -27,6 +27,7 @@ CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
         "description": "深夜急诊，患儿突发呼吸困难，家长极度焦虑。",
+        "opening_line": "医生！您快看看我家孩子！半夜突然喘不上气，我快吓死了！",
         "audio": "stridor.mp3", "images": {"犬吠样咳嗽": "dog_cough.jpg", "吸气性喉鸣": "stridor.jpg", "三凹征": "three_depressions.jpg"},
         "clues": ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "白天感冒史", "三凹征"],
         "ai_role": "2岁急性喉炎患儿的妈妈。极度焦虑、自责。",
@@ -42,6 +43,7 @@ CASES_CONFIG = {
     "foreign_body": {
         "name": "1岁患儿的剧烈呛咳", "disease": "气道异物", "patient": "童童，1岁8个月，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "进食花生后突发剧烈呛咳，气道部分梗阻，生死一线。",
+        "opening_line": "医生！快救救他！他刚才吃花生突然咳得整个人弓起来，脸都憋紫了！",
         "audio": "wheezing.mp3", "images": {"剧烈呛咳": "choking.jpg"},
         "clues": ["进食呛咳史", "剧烈呛咳", "呼吸音不对称", "面色发绀"],
         "ai_role": "1岁气道异物患儿的妈妈。极度恐慌、语无伦次。",
@@ -57,6 +59,7 @@ CASES_CONFIG = {
     "asthma": {
         "name": "4岁患儿的反复喘息", "disease": "支气管哮喘急性发作", "patient": "安安，4岁，女", "difficulty": "⭐⭐⭐",
         "description": "既往哮喘病史，本次急性发作，需紧急平喘。",
+        "opening_line": "医生，她以前也喘过，但这次特别厉害，呼气很费力，您快帮帮她！",
         "audio": "wheezing.mp3", "images": {"喘息": "wheezing.jpg"},
         "clues": ["既往哮喘史", "过敏史", "呼气性呼吸困难", "双肺哮鸣音"],
         "ai_role": "4岁哮喘患儿的妈妈。疲惫、担忧。",
@@ -72,6 +75,7 @@ CASES_CONFIG = {
     "epiglottitis": {
         "name": "3岁患儿的高热与流涎", "disease": "急性会厌炎", "patient": "乐乐，3岁，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "高危气道急症，患儿拒绝平卧，严禁强行查体。",
+        "opening_line": "医生，她一直流口水，一躺下就喘不上气，还发高烧，快救救孩子吧！",
         "audio": "stridor.mp3", "images": {"三凹征": "three_depressions.jpg"},
         "clues": ["高热", "流涎", "吞咽困难", "拒绝平卧", "无犬吠样咳嗽"],
         "ai_role": "3岁会厌炎患儿的妈妈。极度恐惧。",
@@ -84,6 +88,27 @@ CASES_CONFIG = {
             "D": {"label": "等待放射科拍颈部侧位片", "type": "invalid", "disease": 20, "reply": "（等待过程中气道完全梗阻）"}
         }
     }
+}
+
+# ================= 2.5 线索同义词库 =================
+CLUE_KEYWORDS = {
+    "犬吠样咳嗽": ["小狗叫", "狗叫", "空空", "犬吠", "像小狗"],
+    "夜间加重": ["晚上", "半夜", "夜里", "凌晨"],
+    "吸气性喉鸣": ["吸气", "喉咙响", "拉风箱", "吸不进去"],
+    "白天感冒史": ["感冒", "流鼻涕", "白天还好"],
+    "三凹征": ["胸口凹", "凹陷", "锁骨", "肋间", "脖子下面凹"],
+    "进食呛咳史": ["吃东西", "花生", "呛", "卡住"],
+    "剧烈呛咳": ["剧烈咳嗽", "咳得", "拼命咳"],
+    "呼吸音不对称": ["一边没声", "不对称", "右边"],
+    "面色发绀": ["脸紫", "嘴唇紫", "发紫", "憋紫"],
+    "既往哮喘史": ["以前也喘", "小时候喘", "哮喘", "喘过"],
+    "过敏史": ["过敏", "花粉", "起疹子"],
+    "呼气性呼吸困难": ["呼气", "吐气", "出气", "吹气"],
+    "双肺哮鸣音": ["嘶嘶", "拉风箱", "声音尖"],
+    "高热": ["发烧", "烫", "高烧"],
+    "流涎": ["流口水", "口水", "咽不下去"],
+    "吞咽困难": ["不想吃", "吞不下", "一吃就哭"],
+    "拒绝平卧": ["躺下", "一躺", "平躺", "坐下"],
 }
 
 # ================= 3. 通用成就 =================
@@ -650,11 +675,8 @@ if st.session_state.screen == "difficulty_select":
     st.stop()
 
 # ================= 过渡：开场视频页 =================
-# ================= 过渡：开场视频页 =================
 if st.session_state.screen == "intro":
-    import base64
-    
-    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑
+    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑，打造纯全屏沉浸感
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -743,6 +765,7 @@ if st.session_state.screen == "intro":
             st.rerun()
             
     st.stop()
+
 # ================= 11. 成就殿堂 =================
 if st.session_state.screen == "achievements":
     st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">🏅 成就殿堂</div>', unsafe_allow_html=True)
@@ -838,7 +861,7 @@ if st.session_state.screen == "game":
     mode = st.session_state.game_mode
 
     defaults = {
-        "messages": [{"role": "assistant", "content": f"医生！您快看看我家孩子！{case['description']}"}],
+        "messages": [{"role": "assistant", "content": case.get("opening_line", f"医生！快看看孩子！")}],
         "trust_score": 40 if mode == "easy" else 20,
         "action_points": 5 if mode == "easy" else 3,
         "disease_progress": 30,
@@ -870,7 +893,7 @@ if st.session_state.screen == "game":
         st.markdown(f"### 🩺 当前：{case['disease']}")
         render_sidebar_achievements(st.session_state.current_case)
 
-    # 顶部指标 (移除了原本在这里的视频)
+    # 顶部指标
     st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
@@ -974,7 +997,6 @@ if st.session_state.screen == "game":
                             
                             if st.session_state.current_case == "laryngitis":
                                 st.session_state.unlocked_clues.append("三凹征")
-                                # 插入三凹征视频标记
                                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:three_depressions.mp4]"})
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.unlocked_clues.append("面色发绀")
@@ -1064,24 +1086,23 @@ if st.session_state.screen == "game":
                         st.session_state.action_points -= 1
                         st.session_state.messages.append({"role": "user", "content": prompt})
                         
-                        # 线索匹配
-                        for clue in case["clues"]:
-                            if clue in prompt or (clue == "犬吠样咳嗽" and "小狗" in prompt) or (clue == "进食呛咳史" and "花生" in prompt):
-                                if clue not in st.session_state.unlocked_clues:
-                                    st.session_state.unlocked_clues.append(clue)
-                                    st.session_state.score_inquiry += 8
-                                    st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-
-                        # 大模型生成回复
+                        # --- 强化版大模型生成回复 ---
                         try:
+                            system_prompt = f"""你正在扮演：{case['ai_role']}。
+【核心约束】：
+1. 你是一个没有任何医学知识的家长！只能用大白话（口语）描述孩子的症状，例如“咳起来像小狗叫”、“胸口凹进去一块”。
+2. 绝对禁止使用任何专业医学术语！绝对禁止！
+3. 绝对禁止总结陈词或给出任何诊断结论！你只是个着急的家长。
+4. 每次回复严格控制在40字以内。"""
+                            
                             api_messages = [
-                                {"role": "system", "content": f"你正在扮演：{case['ai_role']}。规则：{case['ai_rules']}。当前医生对你说了：{prompt}"},
+                                {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": prompt}
                             ]
                             response = client.chat.completions.create(
                                 model=MODEL_NAME,
                                 messages=api_messages,
-                                temperature=0.7,
+                                temperature=0.3, # 降低温度，减少 AI 放飞自我
                                 max_tokens=100
                             )
                             ai_reply = response.choices[0].message.content
@@ -1099,6 +1120,29 @@ if st.session_state.screen == "game":
                                 ai_reply = "医生，我真的好担心，求您快帮帮孩子吧！"
 
                         st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+
+                        # --- 智能线索解锁逻辑 (双向匹配) ---
+                        # 匹配文本 = 医生的输入 + 家长的回复
+                        match_text = prompt + " " + ai_reply 
+                        
+                        for clue in case["clues"]:
+                            if clue not in st.session_state.unlocked_clues:
+                                # 1. 检查是否包含原词
+                                triggered = clue in match_text
+                                # 2. 检查是否包含同义词库中的词
+                                if not triggered and clue in CLUE_KEYWORDS:
+                                    triggered = any(kw in match_text for kw in CLUE_KEYWORDS[clue])
+                                # 3. 特殊匹配（兼容旧逻辑）
+                                if not triggered:
+                                    if clue == "犬吠样咳嗽" and "小狗" in match_text: triggered = True
+                                    if clue == "进食呛咳史" and "花生" in match_text: triggered = True
+                                
+                                if triggered:
+                                    st.session_state.unlocked_clues.append(clue)
+                                    st.session_state.score_inquiry += 8
+                                    st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                    st.toast(f"💡 发现线索：{clue}", icon="🔍")
+
                         st.rerun()
 
     if st.session_state.game_over:
