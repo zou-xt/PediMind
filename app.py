@@ -651,66 +651,37 @@ if st.session_state.screen == "difficulty_select":
     st.stop()
 
 # ================= 过渡：开场视频页 =================
-if st.session_state.screen == "intro":
-    st.markdown("""
-    <style>
-        [data-testid="stSidebar"] { display: none !important; }
-        [data-testid="stHeader"] { display: none !important; }
-        .stApp { background-color: #000 !important; }
-        .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
-        
-        .bottom-mask {
-            position: fixed; bottom: 0; left: 0; width: 100vw; height: 35vh;
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
-            z-index: 2; pointer-events: none;
-        }
-
-        #custom-start-btn {
-            display: none;
-            position: fixed;
-            bottom: 20vh;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            background: rgba(0, 0, 0, 0.5) !important;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            padding: 15px 30px !important;
-            border-radius: 25px !important;
-            color: #ffffff !important;
-            font-size: 18px !important;
-            font-weight: bold !important;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+rgba(0,0,0,0.5);
+            pointer-events: auto; /* 确保能点击 */
         }
         
         #custom-start-btn:hover {
-            background: rgba(0, 0, 0, 0.8) !important;
-            border-color: rgba(255, 255, 255, 0.8) !important;
+            background: rgba(0, 0, 0, 0.9) !important;
+            border-color: rgba(255, 255, 255, 1) !important;
             transform: translateX(-50%) scale(1.05);
         }
 
         #title-tag {
             display: none;
             position: fixed;
-            bottom: 28vh;
+            bottom: 33vh; /* 跟着按钮上移 */
             left: 50%;
             transform: translateX(-50%);
-            z-index: 100;
-            color: rgba(255,255,255,0.7) !important;
-            font-size: 18px;
+            z-index: 99999 !important;
+            color: rgba(255,255,255,0.8) !important;
+            font-size: 20px;
             font-weight: bold;
             text-align: center;
             letter-spacing: 2px;
             text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
         }
 
+        /* 声音开关图标 */
         #sound-btn {
             position: fixed;
             bottom: 30px;
             right: 30px;
-            z-index: 100;
+            z-index: 99999 !important;
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -764,18 +735,28 @@ if st.session_state.screen == "intro":
                 }}
             }}
             
+            // 视频播放结束显示按钮
             video.onended = showButton;
-            setTimeout(showButton, 15000);
+            // 保底机制：8秒后如果视频还没播完（或者没触发 onended），也强制显示按钮
+            setTimeout(showButton, 8000);
             
+            // 声音开关
             soundBtn.onclick = function() {{
                 video.muted = !video.muted;
                 soundBtn.innerHTML = video.muted ? '🔇' : '🔊';
             }};
             
+            // 最稳妥的跳转逻辑：原生替换 URL 参数
             startBtn.onclick = function() {{
-                const url = new URL(window.top.location.href);
-                url.searchParams.set('screen', 'game');
-                window.top.location.href = url.toString();
+                let url = window.location.href;
+                // 如果已经有 screen 参数，替换它；如果没有，追加它
+                if (url.includes('screen=')) {{
+                    url = url.replace(/screen=[^&]+/, 'screen=game');
+                }} else {{
+                    url += (url.includes('?') ? '&' : '?') + 'screen=game';
+                }}
+                // 使用 replace 避免产生历史记录，直接跳转
+                window.location.replace(url);
             }};
         </script>
         """
@@ -784,6 +765,7 @@ if st.session_state.screen == "intro":
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
         
     st.stop()
+
 
 # ================= 11. 成就殿堂 =================
 if st.session_state.screen == "achievements":
