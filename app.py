@@ -713,7 +713,7 @@ if st.session_state.screen == "intro":
             unsafe_allow_html=True
         )
         
-        if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True):
+        if st.button("▶️ 我准备好了，开始接诊！", use_container_width=True):
             st.session_state.screen = "game"
             st.rerun()
             
