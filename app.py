@@ -27,11 +27,11 @@ CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
         "description": "深夜急诊，患儿突发呼吸困难，家长极度焦虑。",
-        "opening_line": "医生！您快看看我家孩子！半夜突然喘不上气，我快吓死了！",
+        "opening_line": "医生！您快看看我家孩子！突然就这样了，我快吓死了！",
         "audio": "stridor.mp3", "images": {"犬吠样咳嗽": "dog_cough.jpg", "吸气性喉鸣": "stridor.jpg", "三凹征": "three_depressions.jpg"},
         "clues": ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "白天感冒史", "三凹征"],
         "ai_role": "2岁急性喉炎患儿的妈妈。极度焦虑、自责。",
-        "ai_rules": "1.绝对禁止说出任何医学术语！只能说大白话(如'咳起来像小狗叫'、'胸口凹进去一块')。2.绝对禁止给出任何诊断结论！3.每次回复控制在50字以内。",
+        "ai_rules": "1.绝对禁止说出任何医学术语！只能说大白话。2.绝对禁止给出任何诊断结论！3.每次回复控制在50字以内。",
         "diagnosis": {"A": "急性感染性喉炎", "B": "急性会厌炎", "C": "气道异物", "D": "支气管哮喘"},
         "crisis": {
             "A": {"label": "保持坐位，面罩吸氧，布地奈德+肾上腺素雾化", "type": "correct", "disease": -30, "reply": "（雾化后呼吸平稳，面色转红润）"},
@@ -43,11 +43,11 @@ CASES_CONFIG = {
     "foreign_body": {
         "name": "1岁患儿的剧烈呛咳", "disease": "气道异物", "patient": "童童，1岁8个月，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "进食花生后突发剧烈呛咳，气道部分梗阻，生死一线。",
-        "opening_line": "医生！快救救他！他刚才吃花生突然咳得整个人弓起来，脸都憋紫了！",
+        "opening_line": "医生！快救救他！刚才还好好的，突然就这样了！",
         "audio": "wheezing.mp3", "images": {"剧烈呛咳": "choking.jpg"},
         "clues": ["进食呛咳史", "剧烈呛咳", "呼吸音不对称", "面色发绀"],
         "ai_role": "1岁气道异物患儿的妈妈。极度恐慌、语无伦次。",
-        "ai_rules": "1.只能说大白话(如'吃花生突然咳得整个人弓起来'、'脸憋紫了')。2.禁止给出诊断结论。3.回复50字以内。",
+        "ai_rules": "1.只能说大白话。2.禁止给出诊断结论。3.回复50字以内。",
         "diagnosis": {"A": "急性感染性喉炎", "B": "急性会厌炎", "C": "气道异物", "D": "支气管哮喘"},
         "crisis": {
             "A": {"label": "立即施行海姆立克急救法/拍背压胸", "type": "correct", "disease": -30, "reply": "（异物排出，呼吸恢复）"},
@@ -59,11 +59,11 @@ CASES_CONFIG = {
     "asthma": {
         "name": "4岁患儿的反复喘息", "disease": "支气管哮喘急性发作", "patient": "安安，4岁，女", "difficulty": "⭐⭐⭐",
         "description": "既往哮喘病史，本次急性发作，需紧急平喘。",
-        "opening_line": "医生，她以前也喘过，但这次特别厉害，呼气很费力，您快帮帮她！",
+        "opening_line": "医生，她突然喘得很厉害，您快帮帮她！",
         "audio": "wheezing.mp3", "images": {"喘息": "wheezing.jpg"},
         "clues": ["既往哮喘史", "过敏史", "呼气性呼吸困难", "双肺哮鸣音"],
         "ai_role": "4岁哮喘患儿的妈妈。疲惫、担忧。",
-        "ai_rules": "1.说大白话(如'她呼气很费力'、'以前也喘过')。2.禁止给出诊断结论。3.回复50字以内。",
+        "ai_rules": "1.说大白话。2.禁止给出诊断结论。3.回复50字以内。",
         "diagnosis": {"A": "急性感染性喉炎", "B": "急性会厌炎", "C": "气道异物", "D": "支气管哮喘"},
         "crisis": {
             "A": {"label": "吸氧，雾化吸入支气管舒张剂(沙丁胺醇)", "type": "correct", "disease": -30, "reply": "（喘息缓解，肺部哮鸣音减少）"},
@@ -75,11 +75,11 @@ CASES_CONFIG = {
     "epiglottitis": {
         "name": "3岁患儿的高热与流涎", "disease": "急性会厌炎", "patient": "乐乐，3岁，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "高危气道急症，患儿拒绝平卧，严禁强行查体。",
-        "opening_line": "医生，她一直流口水，一躺下就喘不上气，还发高烧，快救救孩子吧！",
+        "opening_line": "医生，孩子发高烧，现在状态特别差，快救救她吧！",
         "audio": "stridor.mp3", "images": {"三凹征": "three_depressions.jpg"},
         "clues": ["高热", "流涎", "吞咽困难", "拒绝平卧", "无犬吠样咳嗽"],
         "ai_role": "3岁会厌炎患儿的妈妈。极度恐惧。",
-        "ai_rules": "1.说大白话(如'一直流口水'、'一躺下就喘不上气')。2.禁止给出诊断结论。3.回复50字以内。",
+        "ai_rules": "1.说大白话。2.禁止给出诊断结论。3.回复50字以内。",
         "diagnosis": {"A": "急性感染性喉炎", "B": "急性会厌炎", "C": "气道异物", "D": "支气管哮喘"},
         "crisis": {
             "A": {"label": "保持坐位，吸氧，静脉使用糖皮质激素，准备气管切开/插管", "type": "correct", "disease": -30, "reply": "（气道水肿减轻，准备进一步气道管理）"},
@@ -90,7 +90,7 @@ CASES_CONFIG = {
     }
 }
 
-# ================= 2.5 线索同义词库 =================
+# ================= 2.5 线索同义词及意图库 =================
 CLUE_KEYWORDS = {
     "犬吠样咳嗽": ["小狗叫", "狗叫", "空空", "犬吠", "像小狗"],
     "夜间加重": ["晚上", "半夜", "夜里", "凌晨"],
@@ -110,6 +110,40 @@ CLUE_KEYWORDS = {
     "吞咽困难": ["不想吃", "吞不下", "一吃就哭"],
     "拒绝平卧": ["躺下", "一躺", "平躺", "坐下"],
 }
+
+def check_clue_trigger(clue: str, prompt: str) -> bool:
+    """智能判定医生的问诊是否触及了线索"""
+    p = prompt.lower()
+    
+    # 1. 先走原有的同义词库匹配
+    if clue in CLUE_KEYWORDS:
+        if any(kw in p for kw in CLUE_KEYWORDS[clue]):
+            return True
+            
+    # 2. 意图匹配逻辑 (问诊套路)
+    if clue == "犬吠样咳嗽":
+        # 只要问了“咳嗽怎么样”、“怎么咳的”、“咳嗽声音”、“咳成什么样”就触发
+        if re.search(r'(咳嗽|咳).*(怎么|什么|如何|声音|样)', p) or "咳" in p:
+            return True
+            
+    elif clue == "夜间加重":
+        if any(k in p for k in ["晚上", "夜里", "半夜", "夜间", "凌晨"]) and any(q in p for q in ["严重", "加重", "厉害", "什么时间", "什么时候"]):
+            return True
+            
+    elif clue == "三凹征":
+        # 问呼吸困难的程度、怎么喘的
+        if re.search(r'(喘|呼吸|吸).*(怎么|什么|如何|费力|困难)', p):
+            return True
+            
+    elif clue == "进食呛咳史":
+        if any(k in p for k in ["吃", "呛", "花生", "异物", "卡"]):
+            return True
+            
+    elif clue == "既往哮喘史":
+        if any(k in p for k in ["以前", "既往", "过去", "小时候", "喘过"]):
+            return True
+
+    return False
 
 # ================= 3. 通用成就 =================
 GLOBAL_ACHIEVEMENTS = {
@@ -257,14 +291,13 @@ if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())[:8]
         st.query_params["pid"] = st.session_state.player_id
 
-# 全局字体定义 (修复图标被覆盖的 Bug)
+# 全局字体定义
 FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');"
 
 if st.session_state.theme == "night":
     theme_css = f"""<style>
         {FONT_IMPORT}
         .stApp {{ background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }}
-        /* 不覆盖 span 和 div 的字体，以免破坏图标 */
         p, label, h1, h2, h3, h4, h5, h6 {{ color: #e2e8f0 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
         section[data-testid="stSidebar"] {{ background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; }}
         div[data-testid="stChatInput"] {{ background-color: #ffffff !important; border-radius: 12px !important; }}
@@ -355,8 +388,7 @@ def render_message(role: str, content: str):
     if role == "user":
         bg = "#95ec69" if not night else "#3eb575"
         fg = "#111111" if not night else "#ffffff"
-        # 👇 这里修改医生的头像路径
-        av = avatar_html("doctor.png", "👨‍⚕️", "#4a90d9") 
+        av = avatar_html("static/doctor.png", "👨‍⚕️", "#4a90d9")
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-end; align-items:flex-start; margin:8px 0;">
             <div style="background:{bg}; color:{fg}; padding:10px 14px; border-radius:14px;
@@ -369,8 +401,7 @@ def render_message(role: str, content: str):
     else:
         bg = "#ffffff" if not night else "rgba(255,255,255,0.12)"
         fg = "#111111" if not night else "#e2e8f0"
-        # 👇 这里修改妈妈的头像路径
-        av = avatar_html("mom.png", "👩", "#f6a623")
+        av = avatar_html("static/mom.png", "👩", "#f6a623")
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-start; align-items:flex-start; margin:8px 0;">
             <div style="margin-right:8px;">{av}</div>
@@ -381,7 +412,6 @@ def render_message(role: str, content: str):
             </div>
         </div>""", unsafe_allow_html=True)
         
-    # 如果有视频，在气泡下方渲染
     if video_paths and role == "assistant":
         for vp in video_paths:
             if os.path.exists(vp):
@@ -414,7 +444,6 @@ def render_monitor(disease_progress: int):
       .vital-value {{ font-size: 28px; font-weight: bold; }}
       .vital-unit  {{ font-size: 10px; color: #888; margin-left: 2px; }}
       
-      /* 颜色定义 */
       .c-green {{ color:#39ff14; text-shadow: 0 0 8px rgba(57,255,20,0.6); }} 
       .c-cyan {{ color:#00ffff; text-shadow: 0 0 8px rgba(0,255,255,0.6); }}
       .c-yellow {{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.6); }}
@@ -707,8 +736,8 @@ if st.session_state.screen == "intro":
             background: rgba(0, 0, 0, 0.5) !important; 
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            padding: 8px 16px !important; /* 缩小内边距 */
-            border-radius: 20px !important; /* 缩小圆角 */
+            padding: 8px 16px !important;
+            border-radius: 20px !important;
             transition: all 0.3s ease !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
         }
@@ -717,10 +746,9 @@ if st.session_state.screen == "intro":
             border-color: rgba(255, 255, 255, 0.8) !important;
             transform: scale(1.02);
         }
-        /* 按钮文字变小 */
         div.stButton > button p {
             color: #ffffff !important;
-            font-size: 14px !important; /* 缩小字号 */
+            font-size: 14px !important;
             font-weight: 500 !important;
         }
     </style>
@@ -744,12 +772,10 @@ if st.session_state.screen == "intro":
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
 
     # 3. UI 层：整体下移
-    _, col_mid, _ = st.columns([1, 1.2, 1]) # 中间列稍微收窄一点，按钮不会太长
+    _, col_mid, _ = st.columns([1, 1.2, 1])
     with col_mid:
-        # 加大占位，把 UI 往下推到接近底部 (72vh)
         st.markdown('<div style="height: 72vh;"></div>', unsafe_allow_html=True)
         
-        # 标题变小、低调，放在按钮上方
         st.markdown(
             '<div style="text-align: center; font-size: 20px; font-weight: bold; color: rgba(255,255,255,0.7) !important; '
             'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 15px; letter-spacing: 2px; position: relative; z-index: 10;">'
@@ -757,7 +783,6 @@ if st.session_state.screen == "intro":
             unsafe_allow_html=True
         )
         
-        # 按钮
         if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True):
             st.session_state.screen = "game"
             st.rerun()
@@ -1092,10 +1117,11 @@ if st.session_state.screen == "game":
                         try:
                             system_prompt = f"""你正在扮演：{case['ai_role']}。
 【核心约束】：
-1. 你是一个没有任何医学知识的家长！只能用大白话（口语）描述孩子的症状，例如“咳起来像小狗叫”、“胸口凹进去一块”。
-2. 绝对禁止使用任何专业医学术语！绝对禁止！
-3. 绝对禁止总结陈词或给出任何诊断结论！你只是个着急的家长。
-4. 每次回复严格控制在40字以内。"""
+1. 你是一个没有任何医学知识的家长，只能用大白话（口语）交流。
+2. 【极其重要】绝对不要主动罗列症状！医生问什么，你就答什么。
+3. 如果医生问：“孩子咳嗽怎么样的？”、“咳嗽声音什么样？”，你就回答：“像小狗叫一样，空空的”（此时系统会自动给你解锁线索）。
+4. 绝对禁止使用专业术语，绝对禁止给诊断结论！你只是个着急的家长。
+5. 每次回复严格控制在40字以内。"""
                             
                             api_messages = [
                                 {"role": "system", "content": system_prompt},
@@ -1123,27 +1149,17 @@ if st.session_state.screen == "game":
 
                         st.session_state.messages.append({"role": "assistant", "content": ai_reply})
 
-                        # --- 智能线索解锁逻辑 (双向匹配) ---
-                        # 匹配文本 = 医生的输入 + 家长的回复
-                        match_text = prompt + " " + ai_reply 
+                        # --- 智能线索解锁逻辑 (意图匹配) ---
+                        match_text = prompt # 只匹配医生的提问
                         
                         for clue in case["clues"]:
                             if clue not in st.session_state.unlocked_clues:
-                                # 1. 检查是否包含原词
-                                triggered = clue in match_text
-                                # 2. 检查是否包含同义词库中的词
-                                if not triggered and clue in CLUE_KEYWORDS:
-                                    triggered = any(kw in match_text for kw in CLUE_KEYWORDS[clue])
-                                # 3. 特殊匹配（兼容旧逻辑）
-                                if not triggered:
-                                    if clue == "犬吠样咳嗽" and "小狗" in match_text: triggered = True
-                                    if clue == "进食呛咳史" and "花生" in match_text: triggered = True
-                                
-                                if triggered:
+                                # 调用我们写好的智能判定函数
+                                if check_clue_trigger(clue, match_text):
                                     st.session_state.unlocked_clues.append(clue)
                                     st.session_state.score_inquiry += 8
                                     st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                                    st.toast(f"💡 发现线索：{clue}", icon="🔍")
+                                    st.toast(f"💡 问诊发现线索：{clue}", icon="🔍")
 
                         st.rerun()
 
