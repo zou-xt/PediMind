@@ -782,8 +782,8 @@ if st.session_state.screen == "game":
     # 开场视频
     if st.session_state.time_period == 1 and not st.session_state.intro_video_played:
         st.subheader("🎬 急诊室画面")
-        if os.path.exists("static/intro_er.mp4"):
-            st.video("static/intro_er.mp4", autoplay=True, muted=True)
+        if os.path.exists("intro_er.mp4"):
+            st.video("intro_er.mp4", autoplay=True, muted=True)
         else:
             st.info("（此处为开场视频：深夜急诊，一位母亲抱着孩子冲进抢救室…）")
         if st.button("⏭️ 跳过开场"):
@@ -894,7 +894,7 @@ if st.session_state.screen == "game":
                             if st.session_state.current_case == "laryngitis":
                                 st.session_state.unlocked_clues.append("三凹征")
                                 # 插入视频标记
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:static/three_depressions.mp4]"})
+                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:three_depressions.mp4]"})
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.unlocked_clues.append("面色发绀")
                                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿面色口唇发绀，剧烈咳嗽，双手抓喉。）"})
