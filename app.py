@@ -267,6 +267,10 @@ def fetch_all_records():
 # ================= 6. 页面与状态 =================
 st.set_page_config(page_title="PediMind · 急诊风云", page_icon="🏥", layout="wide")
 
+# 接收来自过场动画的跳转信号
+if st.query_params.get("screen") == "game":
+    st.session_state.screen = "game"
+
 if "theme" not in st.session_state: st.session_state.theme = "day"
 if "screen" not in st.session_state: st.session_state.screen = "start"
 if "current_case" not in st.session_state: st.session_state.current_case = None
@@ -648,10 +652,6 @@ if st.session_state.screen == "difficulty_select":
 
 # ================= 过渡：开场视频页 =================
 if st.session_state.screen == "intro":
-    # 初始化静音状态（默认静音，保证画面能自动播放）
-    if "intro_muted" not in st.session_state:
-        st.session_state.intro_muted = True
-
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -664,72 +664,125 @@ if st.session_state.screen == "intro":
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
             z-index: 2; pointer-events: none;
         }
-        
-        div.stButton { position: relative; z-index: 100; }
-        div.stButton > button {
-            background: rgba(0, 0, 0, 0.5) !important; backdrop-filter: blur(10px);
+
+        #custom-start-btn {
+            display: none;
+            position: fixed;
+            bottom: 20vh;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5) !important;
+            backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            padding: 12px 20px !important; border-radius: 25px !important;
-            transition: all 0.3s ease !important; box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+            padding: 15px 30px !important;
+            border-radius: 25px !important;
+            color: #ffffff !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        div.stButton > button:hover {
+        
+        #custom-start-btn:hover {
             background: rgba(0, 0, 0, 0.8) !important;
-            border-color: rgba(255, 255, 255, 0.8) !important; transform: scale(1.02);
+            border-color: rgba(255, 255, 255, 0.8) !important;
+            transform: translateX(-50%) scale(1.05);
         }
-        div.stButton > button p {
-            color: #ffffff !important; font-size: 16px !important; font-weight: 500 !important;
+
+        #title-tag {
+            display: none;
+            position: fixed;
+            bottom: 28vh;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: rgba(255,255,255,0.7) !important;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 2px;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
+        }
+
+        #sound-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+        
+        #sound-btn:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: scale(1.1);
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # 根据状态决定是否添加 muted
-    muted_attr = "muted" if st.session_state.intro_muted else ""
-    
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
         
-        bg_html = f"""
+        video_html = f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none;">
-            <video autoplay {muted_attr} loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
+            <video id="intro-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;">
                 <source src="data:video/mp4;base64,{video_b64}" type="video/mp4">
             </video>
         </div>
         <div class="bottom-mask"></div>
+        
+        <div id="title-tag">🎬 急诊室画面</div>
+        <button id="custom-start-btn">▶️ 医生，我准备好了，开始接诊！</button>
+        <div id="sound-btn" title="开启/关闭声音">🔇</div>
+
+        <script>
+            const video = document.getElementById('intro-video');
+            const startBtn = document.getElementById('custom-start-btn');
+            const titleTag = document.getElementById('title-tag');
+            const soundBtn = document.getElementById('sound-btn');
+            
+            let isBtnShown = false;
+            function showButton() {{
+                if (!isBtnShown) {{
+                    startBtn.style.display = 'block';
+                    titleTag.style.display = 'block';
+                    isBtnShown = true;
+                }}
+            }}
+            
+            video.onended = showButton;
+            setTimeout(showButton, 15000);
+            
+            soundBtn.onclick = function() {{
+                video.muted = !video.muted;
+                soundBtn.innerHTML = video.muted ? '🔇' : '🔊';
+            }};
+            
+            startBtn.onclick = function() {{
+                const url = new URL(window.top.location.href);
+                url.searchParams.set('screen', 'game');
+                window.top.location.href = url.toString();
+            }};
+        </script>
         """
-        st.markdown(bg_html, unsafe_allow_html=True)
+        st.markdown(video_html, unsafe_allow_html=True)
     else:
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
-
-    # 中间 UI 层：下移
-    _, col_mid, _ = st.columns([1, 1.2, 1])
-    with col_mid:
-        st.markdown('<div style="height: 65vh;"></div>', unsafe_allow_html=True)
         
-        st.markdown(
-            '<div style="text-align: center; font-size: 20px; font-weight: bold; color: rgba(255,255,255,0.7) !important; '
-            'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 20px; letter-spacing: 2px; position: relative; z-index: 10;">'
-            '🎬 急诊室画面</div>', 
-            unsafe_allow_html=True
-        )
-        
-        if st.button("▶️ 我准备好了，开始接诊！", use_container_width=True):
-            st.session_state.screen = "game"
-            st.rerun()
-            
-        # 右下角的音量开关按钮
-        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-        _, col_vol, _ = st.columns([1, 1, 1])
-        with col_vol:
-            if st.session_state.intro_muted:
-                if st.button("🔇 开启声音", use_container_width=True):
-                    st.session_state.intro_muted = False
-                    st.rerun()
-            else:
-                if st.button("🔊 关闭声音", use_container_width=True):
-                    st.session_state.intro_muted = True
-                    st.rerun()
-                    
     st.stop()
 
 # ================= 11. 成就殿堂 =================
@@ -837,7 +890,7 @@ if st.session_state.screen == "game":
         "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
         "diagnosis_made": None, "diagnosis_processed": False,
         "auscultation_mode": False, "auscultation_completed": False,
-        "visual_exam_mode": False, # 视诊新增
+        "visual_exam_mode": False,
         "physical_exam_done": {}, "comm_made": False,
         "crisis_start_time": time.time(), "record_saved": False
     }
@@ -877,7 +930,6 @@ if st.session_state.screen == "game":
         st.divider()
         
         if not st.session_state.game_over:
-            # 第一/三幕流转逻辑
             if st.session_state.time_period in [1, 3]:
                 if st.session_state.action_points <= 0:
                     if st.session_state.time_period == 1:
@@ -886,7 +938,6 @@ if st.session_state.screen == "game":
                             st.session_state.disease_progress += 10
                             st.rerun()
                     else:
-                        # 第三幕结束，进入急救
                         if st.button("🚨 突发事件！进入急救", use_container_width=True):
                             st.session_state.time_period = 4
                             st.session_state.action_points = 3
@@ -897,7 +948,6 @@ if st.session_state.screen == "game":
                 else:
                     st.caption(f"💡 剩余行动点：{st.session_state.action_points}（点数用完自动进入下一幕）")
             
-            # 急救后的过渡
             if st.session_state.time_period == 4 and st.session_state.crisis_correct_count >= 2:
                 if st.button("✅ 进入第五幕", use_container_width=True):
                     st.session_state.score_emergency += 20
@@ -906,7 +956,6 @@ if st.session_state.screen == "game":
                     st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸平稳）"})
                     st.rerun()
             
-            # 第五幕医患沟通
             if st.session_state.time_period == 5 and not st.session_state.comm_made:
                 st.warning("⚠️ 交代病情：")
                 if st.button("A. 赶紧办住院", key="c_a"):
@@ -953,7 +1002,6 @@ if st.session_state.screen == "game":
             if st.session_state.time_period == 1: st.info("任务：安抚情绪，了解发病时间和特征。")
         else: st.title("🏥 结案复盘")
 
-        # 体格检查工具箱
         if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
             with st.expander("🩺 体格检查工具箱（消耗行动点）", expanded=False):
                 tab1, tab2, tab3 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊/叩诊"])
@@ -963,7 +1011,7 @@ if st.session_state.screen == "game":
                         if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("vis"):
                             st.session_state.action_points -= 1
                             st.session_state.physical_exam_done["vis"] = True
-                            st.session_state.visual_exam_mode = True # 开启视诊作答模式
+                            st.session_state.visual_exam_mode = True
                             st.rerun()
                         elif st.session_state.action_points <= 0:
                             st.error("行动点不足！")
@@ -982,9 +1030,7 @@ if st.session_state.screen == "game":
                             st.session_state.action_points -= 1
                             st.session_state.physical_exam_done["palp"] = True
                             
-                            # --- 根据不同疾病设定触诊/叩诊的结果 ---
                             if st.session_state.current_case in ["laryngitis", "epiglottitis"]:
-                                # 喉炎和会厌炎：严重惩罚，加重病情
                                 st.session_state.disease_progress = min(100, st.session_state.disease_progress + 15)
                                 st.session_state.penalty_log.append("不必要的触诊激惹患儿")
                                 st.session_state.messages.append({
@@ -993,7 +1039,6 @@ if st.session_state.screen == "game":
                                 })
                                 st.toast("🚨 激惹患儿导致病情加重！", icon="⚠️")
                                 if st.session_state.disease_progress >= 100: st.session_state.game_over = True
-                                    
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                 st.session_state.unlocked_clues.append("呼吸音不对称")
@@ -1006,7 +1051,6 @@ if st.session_state.screen == "game":
                         elif st.session_state.action_points <= 0:
                             st.error("行动点不足！")
 
-        # --- 视诊模式界面 ---
         if st.session_state.get("visual_exam_mode", False):
             st.warning("👁️ 视诊中：请仔细观察画面，并在下方输入您的判断。")
             
@@ -1058,7 +1102,6 @@ if st.session_state.screen == "game":
                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：你观察了一会儿，但未能明确说出体征名称。）"})
                 st.rerun()
 
-        # --- 听诊模式界面 ---
         elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
             if os.path.exists(f"static/{case['audio']}"): st.audio(f"static/{case['audio']}", format="audio/mp3")
@@ -1076,7 +1119,6 @@ if st.session_state.screen == "game":
                 st.session_state.auscultation_mode = False
                 st.session_state.auscultation_completed = True; st.rerun()
 
-        # --- 正常聊天与决策界面 ---
         else:
             with st.container(height=400):
                 for msg in st.session_state.messages:
@@ -1155,7 +1197,6 @@ if st.session_state.screen == "game":
                                     st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
                                     st.session_state.penalty_log.append(f"误诊为{opt_val}")
                                     st.session_state.messages.append({"role": "assistant", "content": "❌ 误诊！病情加重。"})
-                                # 自动进入第三幕
                                 st.session_state.time_period = 3
                                 st.session_state.action_points = 5
                                 st.session_state.disease_progress += 10
