@@ -651,8 +651,39 @@ if st.session_state.screen == "difficulty_select":
     st.stop()
 
 # ================= 过渡：开场视频页 =================
-rgba(0,0,0,0.5);
-            pointer-events: auto; /* 确保能点击 */
+if st.session_state.screen == "intro":
+    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑
+    custom_css = """
+    <style>
+        [data-testid="stSidebar"] { display: none !important; }
+        [data-testid="stHeader"] { display: none !important; }
+        .stApp { background-color: #000 !important; }
+        .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+        
+        .bottom-mask {
+            position: fixed; bottom: 0; left: 0; width: 100vw; height: 35vh;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            z-index: 10; pointer-events: none;
+        }
+
+        #custom-start-btn {
+            display: none;
+            position: fixed;
+            bottom: 25vh;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999 !important;
+            background: rgba(0, 0, 0, 0.6) !important;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.4) !important;
+            padding: 15px 35px !important;
+            border-radius: 30px !important;
+            color: #ffffff !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         
         #custom-start-btn:hover {
@@ -664,7 +695,7 @@ rgba(0,0,0,0.5);
         #title-tag {
             display: none;
             position: fixed;
-            bottom: 33vh; /* 跟着按钮上移 */
+            bottom: 33vh;
             left: 50%;
             transform: translateX(-50%);
             z-index: 99999 !important;
@@ -676,7 +707,6 @@ rgba(0,0,0,0.5);
             text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
         }
 
-        /* 声音开关图标 */
         #sound-btn {
             position: fixed;
             bottom: 30px;
@@ -702,8 +732,10 @@ rgba(0,0,0,0.5);
             transform: scale(1.1);
         }
     </style>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
 
+    # 2. 视频和JS逻辑
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
@@ -735,27 +767,21 @@ rgba(0,0,0,0.5);
                 }}
             }}
             
-            // 视频播放结束显示按钮
             video.onended = showButton;
-            // 保底机制：8秒后如果视频还没播完（或者没触发 onended），也强制显示按钮
             setTimeout(showButton, 8000);
             
-            // 声音开关
             soundBtn.onclick = function() {{
                 video.muted = !video.muted;
                 soundBtn.innerHTML = video.muted ? '🔇' : '🔊';
             }};
             
-            // 最稳妥的跳转逻辑：原生替换 URL 参数
             startBtn.onclick = function() {{
                 let url = window.location.href;
-                // 如果已经有 screen 参数，替换它；如果没有，追加它
                 if (url.includes('screen=')) {{
                     url = url.replace(/screen=[^&]+/, 'screen=game');
                 }} else {{
                     url += (url.includes('?') ? '&' : '?') + 'screen=game';
                 }}
-                // 使用 replace 避免产生历史记录，直接跳转
                 window.location.replace(url);
             }};
         </script>
@@ -765,7 +791,6 @@ rgba(0,0,0,0.5);
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
         
     st.stop()
-
 
 # ================= 11. 成就殿堂 =================
 if st.session_state.screen == "achievements":
