@@ -650,10 +650,11 @@ if st.session_state.screen == "difficulty_select":
     st.stop()
 
 # ================= 过渡：开场视频页 =================
+# ================= 过渡：开场视频页 =================
 if st.session_state.screen == "intro":
     import base64
     
-    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑，打造纯全屏沉浸感
+    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -661,35 +662,47 @@ if st.session_state.screen == "intro":
         .stApp { background-color: #000 !important; }
         .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
         
-        /* 按钮层级与样式 */
+        /* 底部黑色渐变遮罩（营造电影感，防止视频过亮看不清字） */
+        .bottom-mask {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 35vh;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* 按钮层级与样式调整 */
         div.stButton {
             position: relative;
             z-index: 100;
         }
         div.stButton > button {
-            background: rgba(0, 0, 0, 0.6) !important; 
+            background: rgba(0, 0, 0, 0.5) !important; 
             backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.4) !important;
-            padding: 15px 30px !important;
-            border-radius: 30px !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            padding: 8px 16px !important; /* 缩小内边距 */
+            border-radius: 20px !important; /* 缩小圆角 */
             transition: all 0.3s ease !important;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
         }
         div.stButton > button:hover {
             background: rgba(0, 0, 0, 0.8) !important;
             border-color: rgba(255, 255, 255, 0.8) !important;
-            transform: scale(1.05);
+            transform: scale(1.02);
         }
-        /* 强制覆盖全局深色文字，让按钮和标题变成纯白 */
+        /* 按钮文字变小 */
         div.stButton > button p {
             color: #ffffff !important;
-            font-size: 18px !important;
-            font-weight: bold !important;
+            font-size: 14px !important; /* 缩小字号 */
+            font-weight: 500 !important;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # 2. 原生 HTML 渲染视频，z-index 改为 1，确保不被底部背景盖住
+    # 2. 原生 HTML 渲染视频，并注入底部遮罩
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
@@ -700,25 +713,27 @@ if st.session_state.screen == "intro":
                 <source src="data:video/mp4;base64,{video_b64}" type="video/mp4">
             </video>
         </div>
+        <div class="bottom-mask"></div>
         """
         st.markdown(bg_html, unsafe_allow_html=True)
     else:
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
 
-    # 3. UI 层：z-index 必须比视频高 (这里用了 z-index: 10)
-    _, col_mid, _ = st.columns([1, 1.5, 1])
+    # 3. UI 层：整体下移
+    _, col_mid, _ = st.columns([1, 1.2, 1]) # 中间列稍微收窄一点，按钮不会太长
     with col_mid:
-        # 占位，把按钮推到偏下的位置
-        st.markdown('<div style="height: 45vh; position: relative; z-index: 10;"></div>', unsafe_allow_html=True)
+        # 加大占位，把 UI 往下推到接近底部 (72vh)
+        st.markdown('<div style="height: 72vh;"></div>', unsafe_allow_html=True)
         
-        # 标题，强制白色
+        # 标题变小、低调，放在按钮上方
         st.markdown(
-            '<div style="text-align: center; font-size: 48px; font-weight: 900; color: #ffffff !important; '
-            'text-shadow: 2px 2px 8px rgba(0,0,0,0.8); margin-bottom: 30px; letter-spacing: 5px; position: relative; z-index: 10;">'
+            '<div style="text-align: center; font-size: 20px; font-weight: bold; color: rgba(255,255,255,0.7) !important; '
+            'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 15px; letter-spacing: 2px; position: relative; z-index: 10;">'
             '🎬 急诊室画面</div>', 
             unsafe_allow_html=True
         )
         
+        # 按钮
         if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True):
             st.session_state.screen = "game"
             st.rerun()
