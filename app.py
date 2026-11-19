@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import os, time, json, base64, html, sqlite3, uuid
+import os, time, json, base64, html, sqlite3, uuid, re
 from datetime import datetime
 from contextlib import contextmanager
 import pandas as pd
@@ -216,7 +216,6 @@ def fetch_all_records():
 # ================= 6. 页面与状态 =================
 st.set_page_config(page_title="PediMind · 急诊风云", page_icon="🏥", layout="wide")
 
-# 默认改为白天模式
 if "theme" not in st.session_state: st.session_state.theme = "day"
 if "screen" not in st.session_state: st.session_state.screen = "start"
 if "current_case" not in st.session_state: st.session_state.current_case = None
@@ -233,14 +232,15 @@ if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())[:8]
         st.query_params["pid"] = st.session_state.player_id
 
-# 全局字体定义
+# 全局字体定义 (修复图标被覆盖的 Bug)
 FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');"
 
 if st.session_state.theme == "night":
     theme_css = f"""<style>
         {FONT_IMPORT}
-        .stApp {{ background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
-        p, span, div, label, h1, h2, h3, h4, h5, h6 {{ color: #e2e8f0 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
+        .stApp {{ background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }}
+        /* 不覆盖 span 和 div 的字体，以免破坏图标 */
+        p, label, h1, h2, h3, h4, h5, h6 {{ color: #e2e8f0 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
         section[data-testid="stSidebar"] {{ background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; }}
         div[data-testid="stChatInput"] {{ background-color: #ffffff !important; border-radius: 12px !important; }}
         div[data-testid="stChatInput"] textarea {{ color: #4a5568 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
@@ -253,8 +253,8 @@ if st.session_state.theme == "night":
 else:
     theme_css = f"""<style>
         {FONT_IMPORT}
-        .stApp {{ background-color: #f0f4f8 !important; color: #1a202c !important; font-family: 'Inter', 'Noto Sans SC', sans-serif !important; }}
-        p, span, div, label, h1, h2, h3, h4, h5, h6 {{ color: #1a202c !important; font-family: 'Inter', 'Noto Sans SC', sans-serif !important; }}
+        .stApp {{ background-color: #f0f4f8 !important; color: #1a202c !important; }}
+        p, label, h1, h2, h3, h4, h5, h6 {{ color: #1a202c !important; font-family: 'Inter', 'Noto Sans SC', sans-serif !important; }}
         section[data-testid="stSidebar"] {{ background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }}
         .stButton>button {{ border-radius: 12px !important; border: 1px solid #0077b6 !important; background: #ffffff !important; color: #0077b6 !important; font-family: 'Inter', 'Noto Sans SC', sans-serif !important; font-weight: 600 !important; }}
         .stButton>button:hover {{ background: #e0f2fe !important; }}
@@ -309,7 +309,11 @@ def load_avatar(path: str) -> str:
     return f"data:image/{mime};base64,{b64}"
 
 def render_message(role: str, content: str):
-    safe = html.escape(str(content)).replace("\n", "<br>")
+    # 解析视频标记
+    video_paths = re.findall(r'\[VIDEO:(.+?)\]', content)
+    safe_text = re.sub(r'\[VIDEO:.+?\]', '', content).strip()
+    safe = html.escape(str(safe_text)).replace("\n", "<br>")
+    
     night = st.session_state.theme == "night"
     AVATAR_SIZE = "38px"
 
@@ -349,51 +353,72 @@ def render_message(role: str, content: str):
                 {safe}
             </div>
         </div>""", unsafe_allow_html=True)
+        
+    # 如果有视频，在气泡下方渲染
+    if video_paths and role == "assistant":
+        for vp in video_paths:
+            if os.path.exists(vp):
+                st.video(vp)
+            else:
+                st.info(f"（视频文件未找到: {vp}）")
 
 def render_monitor(disease_progress: int):
-    # 更逼真的监护仪排版
+    # 重症监护仪 UI 重写
     if disease_progress < 40:
-        hr, spo2, rr, status = 120, 97, 28, "normal"
+        hr, spo2, rr, bp_sys, bp_dia, status = 120, 97, 28, 100, 60, "normal"
     elif disease_progress < 70:
-        hr, spo2, rr, status = 140, 93, 35, "warn"
+        hr, spo2, rr, bp_sys, bp_dia, status = 140, 93, 35, 90, 50, "warn"
     elif disease_progress < 90:
-        hr, spo2, rr, status = 160, 88, 45, "danger"
+        hr, spo2, rr, bp_sys, bp_dia, status = 160, 88, 45, 80, 40, "danger"
     else:
-        hr, spo2, rr, status = 180, 82, 55, "critical"
+        hr, spo2, rr, bp_sys, bp_dia, status = 180, 82, 55, 60, 30, "critical"
 
     html_code = f"""
     <!DOCTYPE html><html><head><style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
-      body {{ background:#050a0f; overflow:hidden; font-family:'Courier New',monospace; }}
-      .monitor {{ position:relative; width:100%; height:210px; background:#050a0f;
-                 border-radius:8px; border:2px solid #1a1a1a; overflow:hidden;
-                 box-shadow: inset 0 0 30px rgba(0,0,0,0.8); display:flex; }}
+      body {{ background:#000; overflow:hidden; font-family:'Courier New',monospace; display:flex; justify-content:center; }}
+      .monitor {{ position:relative; width:100%; max-width: 450px; height:230px; background:#000;
+                 border-radius:6px; border:2px solid #333; overflow:hidden;
+                 display:flex; box-shadow: inset 0 0 20px rgba(0,0,0,0.9); }}
       .wave-area {{ flex: 1; position: relative; }}
       canvas {{ display:block; width:100%; height:100%; }}
-      .vitals {{ width: 100px; background: #050a0f; padding: 10px; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid #1a1a1a; }}
-      .vital-item {{ margin-bottom: 12px; line-height: 1; }}
-      .vital-label {{ font-size: 12px; color: #888; letter-spacing: 1px; font-weight: bold; margin-bottom: 2px; }}
-      .vital-value {{ font-size: 32px; font-weight: bold; font-family: 'Courier New', monospace; }}
-      .vital-unit  {{ font-size: 11px; color: #888; margin-left: 4px; }}
+      .vitals {{ width: 110px; background: #000; padding: 10px 8px; display: flex; flex-direction: column; justify-content: space-evenly; border-left: 1px solid #333; }}
+      .vital-item {{ line-height: 1; margin-bottom: 4px; }}
+      .vital-label {{ font-size: 10px; color: #888; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
+      .vital-value {{ font-size: 28px; font-weight: bold; }}
+      .vital-unit  {{ font-size: 10px; color: #888; margin-left: 2px; }}
       
-      .c-green {{ color:#39ff14; text-shadow: 0 0 10px rgba(57,255,20,0.5); }} 
-      .c-yellow {{ color:#ffcc00; text-shadow: 0 0 10px rgba(255,204,0,0.5); }} 
-      .c-red {{ color:#ff3b3b; text-shadow: 0 0 10px rgba(255,59,59,0.5); }}
+      /* 颜色定义 */
+      .c-green {{ color:#39ff14; text-shadow: 0 0 8px rgba(57,255,20,0.6); }} 
+      .c-cyan {{ color:#00ffff; text-shadow: 0 0 8px rgba(0,255,255,0.6); }}
+      .c-yellow {{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.6); }}
+      .c-purple {{ color:#ff00ff; text-shadow: 0 0 8px rgba(255,0,255,0.6); }}
       .blink {{ animation:blink 0.8s infinite; }}
       @keyframes blink {{ 50% {{ opacity:0.3; }} }}
     </style></head><body>
       <div class="monitor">
         <div class="wave-area"><canvas id="ecg"></canvas></div>
         <div class="vitals">
-          <div class="vital-item"><div class="vital-label">HR</div><div id="hr" class="vital-value">--</div><div class="vital-unit">bpm</div></div>
-          <div class="vital-item"><div class="vital-label">SpO₂</div><div id="spo2" class="vital-value">--</div><div class="vital-unit">%</div></div>
-          <div class="vital-item"><div class="vital-label">RR</div><div id="rr" class="vital-value">--</div><div class="vital-unit">/min</div></div>
+          <div class="vital-item">
+              <div class="vital-label">HR</div>
+              <span id="hr" class="vital-value c-green">--</span><span class="vital-unit">bpm</span>
+          </div>
+          <div class="vital-item">
+              <div class="vital-label">BP</div>
+              <span id="bp" class="vital-value c-purple">--/--</span><span class="vital-unit">mmHg</span>
+          </div>
+          <div class="vital-item">
+              <div class="vital-label">SpO₂</div>
+              <span id="spo2" class="vital-value c-cyan">--</span><span class="vital-unit">%</span>
+          </div>
+          <div class="vital-item">
+              <div class="vital-label">RR</div>
+              <span id="rr" class="vital-value c-yellow">--</span><span class="vital-unit">/min</span>
+          </div>
         </div>
       </div>
     <script>
-      const HR={hr}, SPO2={spo2}, RR={rr}, STATUS="{status}";
-      const color = (STATUS==="critical"||STATUS==="danger") ? "#ff3b3b"
-                  : STATUS==="warn" ? "#ffcc00" : "#39ff14";
+      const HR={hr}, SPO2={spo2}, RR={rr}, BP_SYS={bp_sys}, BP_DIA={bp_dia}, STATUS="{status}";
       const canvas = document.getElementById('ecg');
       const ctx = canvas.getContext('2d');
       let W, H;
@@ -406,43 +431,50 @@ def render_monitor(disease_progress: int):
       }}
       window.addEventListener('resize', resize); resize();
 
-      // 真实的 P-QRS-T 波形合成
+      // 波形生成函数
       function ecgSample(p) {{
         let v = 0;
-        if (p > 0.1 && p < 0.18) v += 0.12 * Math.sin((p - 0.1) / 0.08 * Math.PI); // P波
-        if (p > 0.22 && p < 0.24) v -= 0.15; // Q波
-        if (p > 0.24 && p < 0.26) v += 1.0;  // R波
-        if (p > 0.26 && p < 0.28) v -= 0.25; // S波
-        if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); // T波
-        
-        // 基线漂移
-        v += 0.02 * Math.sin(p * Math.PI * 2);
+        if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI); // P
+        if (p > 0.22 && p < 0.24) v -= 0.15; // Q
+        if (p > 0.24 && p < 0.26) v += 1.0;  // R
+        if (p > 0.26 && p < 0.28) v -= 0.25; // S
+        if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); // T
         return v;
+      }}
+      function plethSample(p) {{
+        let v = Math.exp(-Math.pow((p - 0.3) / 0.08, 2));
+        v += Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4; // 重搏波
+        return v;
+      }}
+      function respSample(p) {{
+        return Math.sin(p * Math.PI * 2);
       }}
       
       const BUFFER = 600;
-      const data = new Array(BUFFER).fill(0);
-      let phase = 0;
+      const ecgData = new Array(BUFFER).fill(0);
+      const plethData = new Array(BUFFER).fill(0);
+      const respData = new Array(BUFFER).fill(0);
+      
+      let ecgPhase = 0, plethPhase = 0, respPhase = 0;
       const cycleDur = 60 / HR;
       const sampleInterval = 0.008;
       const perFrame = 2;
-      const dPhase = (sampleInterval / cycleDur) * perFrame;
+      const dEcgPhase = (sampleInterval / cycleDur) * perFrame;
+      const dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
       
-      function drawGrid() {{
+      function drawGrid(h) {{
         ctx.lineWidth = 0.5;
-        ctx.strokeStyle = "rgba(57,255,20,0.08)";
-        for (let x=0; x<W; x+=10) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
-        for (let y=0; y<H; y+=10) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
-        ctx.strokeStyle = "rgba(57,255,20,0.2)";
-        for (let x=0; x<W; x+=50) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }}
-        for (let y=0; y<H; y+=50) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
+        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        for (let x=0; x<W; x+=10) {{ ctx.beginPath(); ctx.moveTo(x,h-h*0.33); ctx.lineTo(x,h); ctx.stroke(); }}
+        for (let y=h-h*0.33; y<h; y+=10) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
       }}
       
-      function drawWave() {{
-        const step = W / BUFFER, midY = H * 0.65, amp = H * 0.55;
+      function drawWave(data, h_offset, h_region, color, amp) {{
+        const step = W / BUFFER;
+        const midY = h_offset + h_region * 0.5;
         ctx.beginPath();
-        ctx.strokeStyle = color; ctx.lineWidth = 2.5;
-        ctx.shadowBlur = 8; ctx.shadowColor = color;
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 4; ctx.shadowColor = color;
         for (let i=0; i<BUFFER; i++) {{
           const x = i*step, y = midY - data[i]*amp;
           i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
@@ -452,29 +484,51 @@ def render_monitor(disease_progress: int):
       
       function loop() {{
         for (let k=0; k<perFrame; k++) {{
-          phase = (phase + dPhase) % 1;
-          let v = ecgSample(phase);
-          if (STATUS==="danger"||STATUS==="critical") v += (Math.random()-0.5)*0.1;
-          data.push(v); data.shift();
+          // ECG
+          ecgPhase = (ecgPhase + dEcgPhase) % 1;
+          let v_ecg = ecgSample(ecgPhase);
+          if (STATUS==="danger"||STATUS==="critical") v_ecg += (Math.random()-0.5)*0.05;
+          ecgData.push(v_ecg); ecgData.shift();
+          
+          // Pleth (与心跳同步)
+          if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; 
+          else plethPhase += dEcgPhase;
+          if(plethPhase > 1) plethPhase = 1;
+          let v_pleth = plethSample(plethPhase);
+          plethData.push(v_pleth); plethData.shift();
+          
+          // Resp
+          respPhase = (respPhase + dRespPhase) % 1;
+          let v_resp = respSample(respPhase);
+          respData.push(v_resp); respData.shift();
         }}
+        
         ctx.clearRect(0,0,W,H);
-        drawGrid(); drawWave();
+        
+        // 绘制三个区域的网格和波形
+        drawGrid(H*0.33);
+        drawWave(ecgData, 0, H*0.33, "#39ff14", H*0.15);       // ECG 绿色
+        drawWave(plethData, H*0.33, H*0.33, "#00ffff", H*0.15); // Pleth 青色
+        drawWave(respData, H*0.66, H*0.34, "#ffff00", H*0.12);  // Resp 黄色
+        
         requestAnimationFrame(loop);
       }}
       requestAnimationFrame(loop);
       
       function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
       function updateVitals() {{
-        const cls = (STATUS==="critical"||STATUS==="danger") ? "vital-value c-red blink"
-                  : STATUS==="warn" ? "vital-value c-yellow" : "vital-value c-green";
-        const hrEl=document.getElementById('hr'), spEl=document.getElementById('spo2'), rrEl=document.getElementById('rr');
-        hrEl.textContent = jit(HR, 2); spEl.textContent = jit(SPO2, 1); rrEl.textContent = jit(RR, 1);
-        hrEl.className = cls; spEl.className = cls; rrEl.className = cls;
+        const hrEl=document.getElementById('hr'), spEl=document.getElementById('spo2'), rrEl=document.getElementById('rr'), bpEl=document.getElementById('bp');
+        hrEl.textContent = jit(HR, 2); spEl.textContent = jit(SPO2, 1); rrEl.textContent = jit(RR, 1); 
+        bpEl.textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1);
+        
+        if (STATUS==="critical"||STATUS==="danger") {{
+            hrEl.className = "vital-value c-green blink"; // 报警时心率闪烁，但保留原色
+        }}
       }}
       updateVitals(); setInterval(updateVitals, 1000);
     </script></body></html>
     """
-    components.html(html_code, height=220, scrolling=False)
+    components.html(html_code, height=240, scrolling=False)
 
 def _try_unlock(key: str):
     if key not in st.session_state.achievements:
@@ -559,8 +613,6 @@ if st.session_state.screen == "start":
         st.caption(f"专属 ID：`{st.session_state.player_id}`（收藏链接即可跨设备恢复）")
         if st.button("🚀 开始游戏", use_container_width=True, type="primary"):
             st.session_state.screen = "case_select"; st.rerun()
-        
-        st.info("💡 提示：数据与成就中心已移至左侧边栏，点击屏幕左上角的 `>` 即可展开查看。")
     st.stop()
 
 # ================= 9. 病例选择 =================
@@ -722,7 +774,6 @@ if st.session_state.screen == "game":
         6: {"title": "🎬 第六幕：结案复盘", "mode": "end"}
     }
 
-    # 在侧边栏渲染当前状态
     with st.sidebar:
         st.markdown("---")
         st.markdown(f"### 🩺 当前：{case['disease']}")
@@ -741,7 +792,7 @@ if st.session_state.screen == "game":
 
     st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
 
-    col_left, col_center, col_right = st.columns([1, 2.5, 1.2])
+    col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
 
     with col_left:
         st.subheader("📈 生命体征")
@@ -842,7 +893,8 @@ if st.session_state.screen == "game":
                             
                             if st.session_state.current_case == "laryngitis":
                                 st.session_state.unlocked_clues.append("三凹征")
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）"})
+                                # 插入视频标记
+                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:static/three_depressions.mp4]"})
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.unlocked_clues.append("面色发绀")
                                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿面色口唇发绀，剧烈咳嗽，双手抓喉。）"})
@@ -953,7 +1005,7 @@ if st.session_state.screen == "game":
                             )
                             ai_reply = response.choices[0].message.content
                         except Exception as e:
-                            # 兜底回复（纯白话语境，无提示词）
+                            # 兜底回复
                             if st.session_state.current_case == "laryngitis":
                                 ai_reply = "医生，她昨晚就开始咳嗽，声音像小狗叫一样，刚才突然喘不上气，我该怎么办啊！"
                             elif st.session_state.current_case == "foreign_body":
