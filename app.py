@@ -24,7 +24,7 @@ BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 四大预设病例 =================
+# ================= 2. 四大预设病例 (已去剧透化) =================
 CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
@@ -459,7 +459,8 @@ if st.session_state.screen == "case_select":
     for case_id, case in CASES_CONFIG.items():
         cols = st.columns([3, 1])
         with cols[0]:
-            st.markdown(f'<div class="case-card"><div style="font-size: 24px; font-weight: bold; color: #00b4d8; margin-bottom: 10px;">📁 {case["name"]} ({case["disease"]})</div><div style="font-size: 14px; margin-bottom: 5px;"><b>患儿：</b>{case["patient"]}</div><div style="font-size: 14px; color: #e63946; margin-bottom: 5px;"><b>难度：</b>{case["difficulty"]}</div><div style="font-size: 13px; font-style: italic; margin-top: 10px;">{case["description"]}</div></div>', unsafe_allow_html=True)
+            # 👇 已修复：去掉了这里的疾病名称剧透
+            st.markdown(f'<div class="case-card"><div style="font-size: 24px; font-weight: bold; color: #00b4d8; margin-bottom: 10px;">📁 {case["name"]}</div><div style="font-size: 14px; margin-bottom: 5px;"><b>患儿：</b>{case["patient"]}</div><div style="font-size: 14px; color: #e63946; margin-bottom: 5px;"><b>难度：</b>{case["difficulty"]}</div><div style="font-size: 13px; font-style: italic; margin-top: 10px;">{case["description"]}</div></div>', unsafe_allow_html=True)
         with cols[1]:
             st.markdown("<br><br>", unsafe_allow_html=True)
             if st.button("▶️ 进入病例", key=f"select_{case_id}", use_container_width=True, type="primary"):
@@ -479,14 +480,14 @@ if st.session_state.screen == "difficulty_select":
             st.session_state.game_mode = "hard"; st.session_state.screen = "game"; st.rerun()
     st.stop()
 
-# 由于移除了视频，这里的 intro 页面已经彻底删除，直接进入 game
-
 if st.session_state.screen == "achievements":
     st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">🏅 成就殿堂</div>', unsafe_allow_html=True)
     total = achievement_total(); got = achievement_unlocked_count()
     c1, c2, c3 = st.columns(3); c1.metric("成就总数", total); c2.metric("已解锁", got); c3.metric("完成度", f"{(got/total*100 if total else 0):.0f}%")
     st.progress(min(1.0, got / total) if total else 0); st.divider()
-    tab_names = ["🌐 通用成就"] + [f"📁 {CASES_CONFIG[cid]['disease']}" for cid in CASES_CONFIG]
+    
+    # 👇 已修复：去掉了这里的疾病名称剧透
+    tab_names = ["🌐 通用成就"] + [f"📁 {CASES_CONFIG[cid]['name']}" for cid in CASES_CONFIG]
     tabs = st.tabs(tab_names)
     with tabs[0]: render_achievement_grid(GLOBAL_ACHIEVEMENTS, "global")
     for i, cid in enumerate(CASES_CONFIG, start=1):
@@ -595,7 +596,8 @@ if st.session_state.screen == "game":
 
     with st.sidebar:
         st.markdown("---")
-        st.markdown(f"### 🩺 当前：{case['disease']}")
+        # 👇 已修复：去掉了侧边栏的疾病名称剧透
+        st.markdown(f"### 🩺 病例：{case['name']}")
         render_sidebar_achievements(st.session_state.current_case)
 
     st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:{"#e63946" if st.session_state.trust_score <= 15 else "#00b4d8"};">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
@@ -897,9 +899,22 @@ if st.session_state.screen == "game":
                                 if check_medical_dispute(): st.rerun()
                             else:
                                 try:
-                                    system_prompt = f"""你正在扮演：{case['ai_role']}。""" if not is_furious else f"""你正在扮演：{case['ai_role']}。【特殊状态】：你极度愤怒！直接骂人、哭喊或威胁换医生！拒绝配合！"""
-                                    system_prompt += "\n规则：1.用大白话。2.不要主动罗列症状，问什么答什么。3.禁止给诊断结论！4.回复控制在40字以内。"
-                                    response = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}], temperature=0.3, max_tokens=100)
+                                    if is_furious:
+                                        system_prompt = f"""你正在扮演：{case['ai_role']}。
+【特殊状态】：你现在极度愤怒和绝望！你觉得医生非常不靠谱。
+【规则】：直接质问、哭喊或威胁换医生，拒绝配合回答医学问题。不要超过40字。"""
+                                    else:
+                                        system_prompt = f"""你正在扮演：{case['ai_role']}。
+你现在心急如焚、带着哭腔，甚至有些自责。你是一个没有任何医学知识的普通家长。
+【核心规则】：
+1. 【问什么答什么】医生问什么，你就答什么，绝对不要主动长篇大论罗列症状。
+2. 【语气生动】用极其口语化、大白话的方式回答，要带出焦急的情绪（多用“哎呀医生”、“急死我了”、“我也不懂啊”等词）。
+3. 【细节化描述】如果医生问“吃了什么”，不要干巴巴地说“米饭炒菜”，要说：“就正常吃了点家常菜和水果啊医生，难道是吃坏东西了吗？”
+4. 【绝对不剧透】不许主动说出你的核心线索（比如“小狗叫”），必须等医生具体问到那个症状你再答。绝对禁止使用专业术语和给出诊断！
+5. 【字数限制】严格控制在50字以内。"""
+                                    
+                                    api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+                                    response = client.chat.completions.create(model=MODEL_NAME, messages=api_messages, temperature=0.4, max_tokens=120)
                                     ai_reply = response.choices[0].message.content
                                 except: ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
 
@@ -944,7 +959,6 @@ if st.session_state.screen == "game":
             save_record({"player_id": st.session_state.player_id, "player_name": st.session_state.player_name, "case_id": st.session_state.current_case, "case_name": case["name"], "disease": case["disease"], "mode": st.session_state.game_mode, "final_score": st.session_state.final_score, "score_inquiry": st.session_state.score_inquiry, "score_diagnosis": st.session_state.score_diagnosis, "score_emergency": st.session_state.score_emergency, "score_empathy": st.session_state.score_empathy, "disease_progress": st.session_state.disease_progress, "survived": 1 if st.session_state.disease_progress < 100 else 0, "mistakes": json.dumps(st.session_state.penalty_log, ensure_ascii=False), "achievements": json.dumps(st.session_state.achievements, ensure_ascii=False), "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
             st.session_state.record_saved = True
 
-        # 🌟 AI 主治医师复盘
         if not st.session_state.ai_review_generated:
             with st.spinner("👨‍⚕️ AI 主治医师正在翻阅你的病历..."):
                 try:
@@ -968,25 +982,20 @@ if st.session_state.screen == "game":
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
         st.plotly_chart(fig, use_container_width=True)
 
-        # 🌟 生成电子证书
         st.subheader("🎓 生成专属虚拟医师执照")
         if st.button("立即生成证书"):
             try:
-                # 创建一个简单的证书底图
                 img = Image.new('RGB', (800, 600), color = (255, 255, 255))
                 d = ImageDraw.Draw(img)
-                # 绘制边框
                 d.rectangle([20, 20, 780, 580], outline=(0, 180, 216), width=5)
                 
-                # 尝试加载中文字体，如果云端没有 packages.txt 可能会失败
                 font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
-                if not os.path.exists(font_path): font_path = "arial.ttf" # Windows 默认
-                
+                if not os.path.exists(font_path): font_path = "arial.ttf"
                 try:
                     font_title = ImageFont.truetype(font_path, 40)
                     font_text = ImageFont.truetype(font_path, 24)
                 except:
-                    font_title = font_text = None # 如果找不到字体，用默认的
+                    font_title = font_text = None
                 
                 d.text((400, 100), "虚拟医师资格认证", fill=(0, 180, 216), font=font_title, anchor="mm")
                 d.text((400, 200), f"兹证明 {st.session_state.player_name} 医生", fill=(0, 0, 0), font=font_text, anchor="mm")
@@ -996,12 +1005,10 @@ if st.session_state.screen == "game":
                 d.text((400, 420), f"获得称号：{st.session_state.final_title}", fill=(230, 57, 70), font=font_text, anchor="mm")
                 d.text((400, 520), "PediMind 智能体大赛组委会 认证", fill=(100, 100, 100), font=font_text, anchor="mm")
                 
-                # 生成二维码 (实际比赛可以放当前页面的URL)
                 qr = qrcode.make(f"http://localhost:8501/?pid={st.session_state.player_id}")
                 qr = qr.resize((100, 100))
                 img.paste(qr, (640, 450))
                 
-                # 转成 bytes 供 Streamlit 显示
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 byte_im = buf.getvalue()
