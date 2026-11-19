@@ -363,7 +363,6 @@ def render_message(role: str, content: str):
                 st.info(f"（视频文件未找到: {vp}）")
 
 def render_monitor(disease_progress: int):
-    # 重症监护仪 UI 重写
     if disease_progress < 40:
         hr, spo2, rr, bp_sys, bp_dia, status = 120, 97, 28, 100, 60, "normal"
     elif disease_progress < 70:
@@ -431,19 +430,18 @@ def render_monitor(disease_progress: int):
       }}
       window.addEventListener('resize', resize); resize();
 
-      // 波形生成函数
       function ecgSample(p) {{
         let v = 0;
-        if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI); // P
-        if (p > 0.22 && p < 0.24) v -= 0.15; // Q
-        if (p > 0.24 && p < 0.26) v += 1.0;  // R
-        if (p > 0.26 && p < 0.28) v -= 0.25; // S
-        if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); // T
+        if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI); 
+        if (p > 0.22 && p < 0.24) v -= 0.15; 
+        if (p > 0.24 && p < 0.26) v += 1.0;  
+        if (p > 0.26 && p < 0.28) v -= 0.25; 
+        if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); 
         return v;
       }}
       function plethSample(p) {{
         let v = Math.exp(-Math.pow((p - 0.3) / 0.08, 2));
-        v += Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4; // 重搏波
+        v += Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4;
         return v;
       }}
       function respSample(p) {{
@@ -484,20 +482,17 @@ def render_monitor(disease_progress: int):
       
       function loop() {{
         for (let k=0; k<perFrame; k++) {{
-          // ECG
           ecgPhase = (ecgPhase + dEcgPhase) % 1;
           let v_ecg = ecgSample(ecgPhase);
           if (STATUS==="danger"||STATUS==="critical") v_ecg += (Math.random()-0.5)*0.05;
           ecgData.push(v_ecg); ecgData.shift();
           
-          // Pleth (与心跳同步)
           if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; 
           else plethPhase += dEcgPhase;
           if(plethPhase > 1) plethPhase = 1;
           let v_pleth = plethSample(plethPhase);
           plethData.push(v_pleth); plethData.shift();
           
-          // Resp
           respPhase = (respPhase + dRespPhase) % 1;
           let v_resp = respSample(respPhase);
           respData.push(v_resp); respData.shift();
@@ -505,11 +500,10 @@ def render_monitor(disease_progress: int):
         
         ctx.clearRect(0,0,W,H);
         
-        // 绘制三个区域的网格和波形
         drawGrid(H*0.33);
-        drawWave(ecgData, 0, H*0.33, "#39ff14", H*0.15);       // ECG 绿色
-        drawWave(plethData, H*0.33, H*0.33, "#00ffff", H*0.15); // Pleth 青色
-        drawWave(respData, H*0.66, H*0.34, "#ffff00", H*0.12);  // Resp 黄色
+        drawWave(ecgData, 0, H*0.33, "#39ff14", H*0.15);       
+        drawWave(plethData, H*0.33, H*0.33, "#00ffff", H*0.15); 
+        drawWave(respData, H*0.66, H*0.34, "#ffff00", H*0.12);  
         
         requestAnimationFrame(loop);
       }}
@@ -522,7 +516,7 @@ def render_monitor(disease_progress: int):
         bpEl.textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1);
         
         if (STATUS==="critical"||STATUS==="danger") {{
-            hrEl.className = "vital-value c-green blink"; // 报警时心率闪烁，但保留原色
+            hrEl.className = "vital-value c-green blink"; 
         }}
       }}
       updateVitals(); setInterval(updateVitals, 1000);
@@ -644,11 +638,37 @@ if st.session_state.screen == "difficulty_select":
     with col1:
         st.info("🌱 **简单模式**\n- 5个行动点\n- 初始信任值40\n- 有详细提示和引导")
         if st.button("开始简单模式", use_container_width=True):
-            st.session_state.game_mode = "easy"; st.session_state.screen = "game"; st.rerun()
+            st.session_state.game_mode = "easy"
+            st.session_state.screen = "intro" # 跳转到视频过渡页
+            st.rerun()
     with col2:
         st.warning("🔥 **困难模式**\n- 3个行动点\n- 初始信任值20\n- 无提示，盲盒线索")
         if st.button("开始困难模式", use_container_width=True):
-            st.session_state.game_mode = "hard"; st.session_state.screen = "game"; st.rerun()
+            st.session_state.game_mode = "hard"
+            st.session_state.screen = "intro" # 跳转到视频过渡页
+            st.rerun()
+    st.stop()
+
+# ================= 过渡：开场视频页 =================
+if st.session_state.screen == "intro":
+    _, col_mid, _ = st.columns([1, 2, 1])
+    with col_mid:
+        st.markdown('<div style="text-align: center; font-size: 36px; font-weight: 900; color: #e63946; margin-top: 30px; margin-bottom: 20px;">🎬 急诊室画面</div>', unsafe_allow_html=True)
+        
+        if os.path.exists("static/intro_er.mp4"):
+            st.video("static/intro_er.mp4", autoplay=True, muted=True)
+        else:
+            st.info("（此处缺少开场视频文件 static/intro_er.mp4，点击下方按钮直接进入）")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True, type="primary"):
+            st.session_state.screen = "game"
+            st.rerun()
+            
+        if st.button("⏭️ 跳过开场", use_container_width=True):
+            st.session_state.screen = "game"
+            st.rerun()
     st.stop()
 
 # ================= 11. 成就殿堂 =================
@@ -757,8 +777,7 @@ if st.session_state.screen == "game":
         "diagnosis_made": None, "diagnosis_processed": False,
         "auscultation_mode": False, "auscultation_completed": False,
         "physical_exam_done": {}, "comm_made": False,
-        "crisis_start_time": time.time(), "record_saved": False,
-        "intro_video_played": False
+        "crisis_start_time": time.time(), "record_saved": False
     }
     for k, v in defaults.items():
         if k not in st.session_state: st.session_state[k] = v
@@ -779,17 +798,7 @@ if st.session_state.screen == "game":
         st.markdown(f"### 🩺 当前：{case['disease']}")
         render_sidebar_achievements(st.session_state.current_case)
 
-    # 开场视频
-    if st.session_state.time_period == 1 and not st.session_state.intro_video_played:
-        st.subheader("🎬 急诊室画面")
-        if os.path.exists("intro_er.mp4"):
-            st.video("intro_er.mp4", autoplay=True, muted=True)
-        else:
-            st.info("（此处为开场视频：深夜急诊，一位母亲抱着孩子冲进抢救室…）")
-        if st.button("⏭️ 跳过开场"):
-            st.session_state.intro_video_played = True; st.rerun()
-        st.session_state.intro_video_played = True
-
+    # 顶部指标 (移除了原本在这里的视频)
     st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:#00b4d8;">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 行动点</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
@@ -893,8 +902,8 @@ if st.session_state.screen == "game":
                             
                             if st.session_state.current_case == "laryngitis":
                                 st.session_state.unlocked_clues.append("三凹征")
-                                # 插入视频标记
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:three_depressions.mp4]"})
+                                # 插入三凹征视频标记
+                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:static/three_depressions.mp4]"})
                             elif st.session_state.current_case == "foreign_body":
                                 st.session_state.unlocked_clues.append("面色发绀")
                                 st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿面色口唇发绀，剧烈咳嗽，双手抓喉。）"})
