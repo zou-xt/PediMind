@@ -114,7 +114,6 @@ CLUE_KEYWORDS = {
 def check_clue_trigger(clue: str, prompt: str) -> bool:
     """智能判定医生的问诊是否触及了线索"""
     p = prompt.lower()
-    
     # 1. 先走原有的同义词库匹配
     if clue in CLUE_KEYWORDS:
         if any(kw in p for kw in CLUE_KEYWORDS[clue]):
@@ -122,27 +121,20 @@ def check_clue_trigger(clue: str, prompt: str) -> bool:
             
     # 2. 意图匹配逻辑 (问诊套路)
     if clue == "犬吠样咳嗽":
-        # 只要问了“咳嗽怎么样”、“怎么咳的”、“咳嗽声音”、“咳成什么样”就触发
-        if re.search(r'(咳嗽|咳).*(怎么|什么|如何|声音|样)', p) or "咳" in p:
+        if "咳" in p or "小狗" in p or "狗叫" in p or "空空" in p:
             return True
-            
     elif clue == "夜间加重":
-        if any(k in p for k in ["晚上", "夜里", "半夜", "夜间", "凌晨"]) and any(q in p for q in ["严重", "加重", "厉害", "什么时间", "什么时候"]):
+        if any(k in p for k in ["晚上", "夜里", "半夜", "夜间", "凌晨"]):
             return True
-            
     elif clue == "三凹征":
-        # 问呼吸困难的程度、怎么喘的
-        if re.search(r'(喘|呼吸|吸).*(怎么|什么|如何|费力|困难)', p):
+        if any(k in p for k in ["喘", "呼吸", "吸", "凹", "陷"]):
             return True
-            
     elif clue == "进食呛咳史":
         if any(k in p for k in ["吃", "呛", "花生", "异物", "卡"]):
             return True
-            
     elif clue == "既往哮喘史":
         if any(k in p for k in ["以前", "既往", "过去", "小时候", "喘过"]):
             return True
-
     return False
 
 # ================= 3. 通用成就 =================
@@ -291,7 +283,7 @@ if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())[:8]
         st.query_params["pid"] = st.session_state.player_id
 
-# 全局字体定义
+# 全局字体
 FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');"
 
 if st.session_state.theme == "night":
@@ -367,7 +359,6 @@ def load_avatar(path: str) -> str:
     return f"data:image/{mime};base64,{b64}"
 
 def render_message(role: str, content: str):
-    # 解析视频标记
     video_paths = re.findall(r'\[VIDEO:(.+?)\]', content)
     safe_text = re.sub(r'\[VIDEO:.+?\]', '', content).strip()
     safe = html.escape(str(safe_text)).replace("\n", "<br>")
@@ -443,7 +434,6 @@ def render_monitor(disease_progress: int):
       .vital-label {{ font-size: 10px; color: #888; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
       .vital-value {{ font-size: 28px; font-weight: bold; }}
       .vital-unit  {{ font-size: 10px; color: #888; margin-left: 2px; }}
-      
       .c-green {{ color:#39ff14; text-shadow: 0 0 8px rgba(57,255,20,0.6); }} 
       .c-cyan {{ color:#00ffff; text-shadow: 0 0 8px rgba(0,255,255,0.6); }}
       .c-yellow {{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.6); }}
@@ -454,22 +444,10 @@ def render_monitor(disease_progress: int):
       <div class="monitor">
         <div class="wave-area"><canvas id="ecg"></canvas></div>
         <div class="vitals">
-          <div class="vital-item">
-              <div class="vital-label">HR</div>
-              <span id="hr" class="vital-value c-green">--</span><span class="vital-unit">bpm</span>
-          </div>
-          <div class="vital-item">
-              <div class="vital-label">BP</div>
-              <span id="bp" class="vital-value c-purple">--/--</span><span class="vital-unit">mmHg</span>
-          </div>
-          <div class="vital-item">
-              <div class="vital-label">SpO₂</div>
-              <span id="spo2" class="vital-value c-cyan">--</span><span class="vital-unit">%</span>
-          </div>
-          <div class="vital-item">
-              <div class="vital-label">RR</div>
-              <span id="rr" class="vital-value c-yellow">--</span><span class="vital-unit">/min</span>
-          </div>
+          <div class="vital-item"><div class="vital-label">HR</div><span id="hr" class="vital-value c-green">--</span><span class="vital-unit">bpm</span></div>
+          <div class="vital-item"><div class="vital-label">BP</div><span id="bp" class="vital-value c-purple">--/--</span><span class="vital-unit">mmHg</span></div>
+          <div class="vital-item"><div class="vital-label">SpO₂</div><span id="spo2" class="vital-value c-cyan">--</span><span class="vital-unit">%</span></div>
+          <div class="vital-item"><div class="vital-label">RR</div><span id="rr" class="vital-value c-yellow">--</span><span class="vital-unit">/min</span></div>
         </div>
       </div>
     <script>
@@ -479,55 +457,33 @@ def render_monitor(disease_progress: int):
       let W, H;
       function resize() {{
         const r = canvas.parentElement.getBoundingClientRect();
-        canvas.width = r.width * devicePixelRatio;
-        canvas.height = r.height * devicePixelRatio;
+        canvas.width = r.width * devicePixelRatio; canvas.height = r.height * devicePixelRatio;
         ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
         W = r.width; H = r.height;
       }}
       window.addEventListener('resize', resize); resize();
-
       function ecgSample(p) {{
         let v = 0;
         if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI); 
-        if (p > 0.22 && p < 0.24) v -= 0.15; 
-        if (p > 0.24 && p < 0.26) v += 1.0;  
-        if (p > 0.26 && p < 0.28) v -= 0.25; 
-        if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); 
+        if (p > 0.22 && p < 0.24) v -= 0.15; if (p > 0.24 && p < 0.26) v += 1.0;  
+        if (p > 0.26 && p < 0.28) v -= 0.25; if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); 
         return v;
       }}
-      function plethSample(p) {{
-        let v = Math.exp(-Math.pow((p - 0.3) / 0.08, 2));
-        v += Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4;
-        return v;
-      }}
-      function respSample(p) {{
-        return Math.sin(p * Math.PI * 2);
-      }}
-      
+      function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.3) / 0.08, 2)) + Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4; }}
+      function respSample(p) {{ return Math.sin(p * Math.PI * 2); }}
       const BUFFER = 600;
-      const ecgData = new Array(BUFFER).fill(0);
-      const plethData = new Array(BUFFER).fill(0);
-      const respData = new Array(BUFFER).fill(0);
-      
+      const ecgData = new Array(BUFFER).fill(0), plethData = new Array(BUFFER).fill(0), respData = new Array(BUFFER).fill(0);
       let ecgPhase = 0, plethPhase = 0, respPhase = 0;
-      const cycleDur = 60 / HR;
-      const sampleInterval = 0.008;
-      const perFrame = 2;
-      const dEcgPhase = (sampleInterval / cycleDur) * perFrame;
-      const dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
-      
+      const cycleDur = 60 / HR, sampleInterval = 0.008, perFrame = 2;
+      const dEcgPhase = (sampleInterval / cycleDur) * perFrame, dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
       function drawGrid(h) {{
-        ctx.lineWidth = 0.5;
-        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(255,255,255,0.05)";
         for (let x=0; x<W; x+=10) {{ ctx.beginPath(); ctx.moveTo(x,h-h*0.33); ctx.lineTo(x,h); ctx.stroke(); }}
         for (let y=h-h*0.33; y<h; y+=10) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
       }}
-      
       function drawWave(data, h_offset, h_region, color, amp) {{
-        const step = W / BUFFER;
-        const midY = h_offset + h_region * 0.5;
-        ctx.beginPath();
-        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        const step = W / BUFFER; const midY = h_offset + h_region * 0.5;
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.5;
         ctx.shadowBlur = 4; ctx.shadowColor = color;
         for (let i=0; i<BUFFER; i++) {{
           const x = i*step, y = midY - data[i]*amp;
@@ -535,45 +491,30 @@ def render_monitor(disease_progress: int):
         }}
         ctx.stroke(); ctx.shadowBlur = 0;
       }}
-      
       function loop() {{
         for (let k=0; k<perFrame; k++) {{
           ecgPhase = (ecgPhase + dEcgPhase) % 1;
           let v_ecg = ecgSample(ecgPhase);
           if (STATUS==="danger"||STATUS==="critical") v_ecg += (Math.random()-0.5)*0.05;
           ecgData.push(v_ecg); ecgData.shift();
-          
-          if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; 
-          else plethPhase += dEcgPhase;
+          if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; else plethPhase += dEcgPhase;
           if(plethPhase > 1) plethPhase = 1;
-          let v_pleth = plethSample(plethPhase);
-          plethData.push(v_pleth); plethData.shift();
-          
+          plethData.push(plethSample(plethPhase)); plethData.shift();
           respPhase = (respPhase + dRespPhase) % 1;
-          let v_resp = respSample(respPhase);
-          respData.push(v_resp); respData.shift();
+          respData.push(respSample(respPhase)); respData.shift();
         }}
-        
-        ctx.clearRect(0,0,W,H);
-        
-        drawGrid(H*0.33);
+        ctx.clearRect(0,0,W,H); drawGrid(H*0.33);
         drawWave(ecgData, 0, H*0.33, "#39ff14", H*0.15);       
         drawWave(plethData, H*0.33, H*0.33, "#00ffff", H*0.15); 
         drawWave(respData, H*0.66, H*0.34, "#ffff00", H*0.12);  
-        
         requestAnimationFrame(loop);
       }}
       requestAnimationFrame(loop);
-      
       function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
       function updateVitals() {{
-        const hrEl=document.getElementById('hr'), spEl=document.getElementById('spo2'), rrEl=document.getElementById('rr'), bpEl=document.getElementById('bp');
-        hrEl.textContent = jit(HR, 2); spEl.textContent = jit(SPO2, 1); rrEl.textContent = jit(RR, 1); 
-        bpEl.textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1);
-        
-        if (STATUS==="critical"||STATUS==="danger") {{
-            hrEl.className = "vital-value c-green blink"; 
-        }}
+        document.getElementById('hr').textContent = jit(HR, 2); document.getElementById('spo2').textContent = jit(SPO2, 1); 
+        document.getElementById('rr').textContent = jit(RR, 1); document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1);
+        if (STATUS==="critical"||STATUS==="danger") document.getElementById('hr').className = "vital-value c-green blink"; 
       }}
       updateVitals(); setInterval(updateVitals, 1000);
     </script></body></html>
@@ -695,70 +636,49 @@ if st.session_state.screen == "difficulty_select":
         st.info("🌱 **简单模式**\n- 5个行动点\n- 初始信任值40\n- 有详细提示和引导")
         if st.button("开始简单模式", use_container_width=True):
             st.session_state.game_mode = "easy"
-            st.session_state.screen = "intro" # 跳转到视频过渡页
+            st.session_state.screen = "intro"
             st.rerun()
     with col2:
         st.warning("🔥 **困难模式**\n- 3个行动点\n- 初始信任值20\n- 无提示，盲盒线索")
         if st.button("开始困难模式", use_container_width=True):
             st.session_state.game_mode = "hard"
-            st.session_state.screen = "intro" # 跳转到视频过渡页
+            st.session_state.screen = "intro"
             st.rerun()
     st.stop()
 
 # ================= 过渡：开场视频页 =================
 if st.session_state.screen == "intro":
-    # 1. 注入CSS：隐藏侧边栏、顶栏，背景变黑，打造纯全屏沉浸感
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
         [data-testid="stHeader"] { display: none !important; }
         .stApp { background-color: #000 !important; }
         .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
-        
-        /* 底部黑色渐变遮罩（营造电影感，防止视频过亮看不清字） */
         .bottom-mask {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100vw;
-            height: 35vh;
+            position: fixed; bottom: 0; left: 0; width: 100vw; height: 35vh;
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
-            z-index: 2;
-            pointer-events: none;
+            z-index: 2; pointer-events: none;
         }
-
-        /* 按钮层级与样式调整 */
-        div.stButton {
-            position: relative;
-            z-index: 100;
-        }
+        div.stButton { position: relative; z-index: 100; }
         div.stButton > button {
-            background: rgba(0, 0, 0, 0.5) !important; 
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.5) !important; backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            padding: 8px 16px !important;
-            border-radius: 20px !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+            padding: 12px 20px !important; border-radius: 25px !important;
+            transition: all 0.3s ease !important; box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
         }
         div.stButton > button:hover {
             background: rgba(0, 0, 0, 0.8) !important;
-            border-color: rgba(255, 255, 255, 0.8) !important;
-            transform: scale(1.02);
+            border-color: rgba(255, 255, 255, 0.8) !important; transform: scale(1.02);
         }
         div.stButton > button p {
-            color: #ffffff !important;
-            font-size: 14px !important;
-            font-weight: 500 !important;
+            color: #ffffff !important; font-size: 16px !important; font-weight: 500 !important;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # 2. 原生 HTML 渲染视频，并注入底部遮罩
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
-        
         bg_html = f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none;">
             <video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
@@ -771,26 +691,18 @@ if st.session_state.screen == "intro":
     else:
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
 
-    # 3. UI 层：整体下移
     _, col_mid, _ = st.columns([1, 1.2, 1])
     with col_mid:
-        st.markdown('<div style="height: 72vh;"></div>', unsafe_allow_html=True)
-        
+        st.markdown('<div style="height: 75vh;"></div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="text-align: center; font-size: 20px; font-weight: bold; color: rgba(255,255,255,0.7) !important; '
-            'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 15px; letter-spacing: 2px; position: relative; z-index: 10;">'
+            'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 20px; letter-spacing: 2px; position: relative; z-index: 10;">'
             '🎬 急诊室画面</div>', 
             unsafe_allow_html=True
         )
-        
         if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True):
             st.session_state.screen = "game"
             st.rerun()
-            
-        if st.button("⏭️ 跳过开场", use_container_width=True):
-            st.session_state.screen = "game"
-            st.rerun()
-            
     st.stop()
 
 # ================= 11. 成就殿堂 =================
@@ -898,6 +810,7 @@ if st.session_state.screen == "game":
         "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
         "diagnosis_made": None, "diagnosis_processed": False,
         "auscultation_mode": False, "auscultation_completed": False,
+        "visual_exam_mode": False, # 视诊新增
         "physical_exam_done": {}, "comm_made": False,
         "crisis_start_time": time.time(), "record_saved": False
     }
@@ -925,6 +838,7 @@ if st.session_state.screen == "game":
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
 
+    # ------------------ 左侧面板 ------------------
     with col_left:
         st.subheader("📈 生命体征")
         dp = st.session_state.disease_progress
@@ -934,40 +848,38 @@ if st.session_state.screen == "game":
         elif dp < 90: st.caption("🧠 意识：发绀、烦躁")
         else: st.caption("🧠 意识：意识模糊")
         st.divider()
+        
         if not st.session_state.game_over:
+            # 第一/三幕流转逻辑
             if st.session_state.time_period in [1, 3]:
-                if st.session_state.time_period == 3 and st.session_state.action_points <= 2 and not st.session_state.diagnosis_processed:
-                    st.warning("⚠️ 请给出初步诊断：")
-                    for opt_key, opt_val in case["diagnosis"].items():
-                        if st.button(opt_val, key=f"diag_{opt_key}", use_container_width=True):
-                            st.session_state.diagnosis_processed = True
-                            st.session_state.diagnosis_made = opt_key
-                            if opt_val == case["disease"]:
-                                st.session_state.score_diagnosis += 15
-                                st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！这是{case['disease']}。"})
-                            else:
-                                st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
-                                st.session_state.penalty_log.append(f"误诊为{opt_val}")
-                                st.session_state.messages.append({"role": "assistant", "content": "❌ 误诊！病情加重。"})
+                if st.session_state.action_points <= 0:
+                    if st.session_state.time_period == 1:
+                        if st.button("▶️ 进入下一幕（初步判断）", use_container_width=True):
+                            st.session_state.time_period = 2
+                            st.session_state.disease_progress += 10
                             st.rerun()
-                elif st.session_state.action_points <= 2 and (st.session_state.time_period == 1 or st.session_state.diagnosis_processed):
-                    if st.button("▶️ 进入下一幕", use_container_width=True):
-                        st.session_state.time_period += 1
-                        st.session_state.action_points = 3 if st.session_state.time_period == 4 else 5
-                        st.session_state.disease_progress += 10; st.rerun()
-                elif st.session_state.action_points > 2:
-                    st.caption(f"💡 强制问诊：还需 {st.session_state.action_points - 2} 次")
-            if st.session_state.time_period == 3 and st.session_state.diagnosis_processed and st.session_state.action_points <= 2:
-                if st.button("🚨 突发事件！进入第四幕", use_container_width=True):
-                    st.session_state.time_period = 4; st.session_state.action_points = 3
-                    st.session_state.disease_progress = max(70, st.session_state.disease_progress + 15)
-                    st.session_state.crisis_start_time = time.time()
-                    st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重）医生！救救她！"}); st.rerun()
+                    else:
+                        # 第三幕结束，进入急救
+                        if st.button("🚨 突发事件！进入急救", use_container_width=True):
+                            st.session_state.time_period = 4
+                            st.session_state.action_points = 3
+                            st.session_state.disease_progress = max(70, st.session_state.disease_progress + 15)
+                            st.session_state.crisis_start_time = time.time()
+                            st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸困难急剧加重）医生！救救她！"})
+                            st.rerun()
+                else:
+                    st.caption(f"💡 剩余行动点：{st.session_state.action_points}（点数用完自动进入下一幕）")
+            
+            # 急救后的过渡
             if st.session_state.time_period == 4 and st.session_state.crisis_correct_count >= 2:
                 if st.button("✅ 进入第五幕", use_container_width=True):
-                    st.session_state.score_emergency += 20; st.session_state.time_period = 5
+                    st.session_state.score_emergency += 20
+                    st.session_state.time_period = 5
                     st.session_state.action_points = 5
-                    st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸平稳）"}); st.rerun()
+                    st.session_state.messages.append({"role": "assistant", "content": "（经过处理，患儿呼吸平稳）"})
+                    st.rerun()
+            
+            # 第五幕医患沟通
             if st.session_state.time_period == 5 and not st.session_state.comm_made:
                 st.warning("⚠️ 交代病情：")
                 if st.button("A. 赶紧办住院", key="c_a"):
@@ -980,6 +892,7 @@ if st.session_state.screen == "game":
             if st.session_state.time_period == 5 and st.session_state.comm_made:
                 if st.button("▶️ 进入复盘", use_container_width=True):
                     st.session_state.time_period = 6; st.rerun()
+                    
         st.divider()
         if st.session_state.time_period >= 5 and not st.session_state.game_over:
             if st.button("📝 提交诊断，结束", use_container_width=True):
@@ -991,6 +904,7 @@ if st.session_state.screen == "game":
                     del st.session_state[key]
             st.session_state.screen = "start"; st.rerun()
 
+    # ------------------ 右侧面板 ------------------
     with col_right:
         st.subheader("🔍 线索夹")
         if mode == "hard":
@@ -1005,12 +919,14 @@ if st.session_state.screen == "game":
             st.divider(); st.caption("📝 失误记录")
             for log in st.session_state.penalty_log: st.warning(log)
 
+    # ------------------ 中间核心区 ------------------
     with col_center:
         if not st.session_state.game_over:
             st.title(SCENARIO_DATA[st.session_state.time_period]["title"])
             if st.session_state.time_period == 1: st.info("任务：安抚情绪，了解发病时间和特征。")
         else: st.title("🏥 结案复盘")
 
+        # 体格检查工具箱
         if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
             with st.expander("🩺 体格检查工具箱（消耗行动点）", expanded=False):
                 tab1, tab2, tab3 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊/叩诊"])
@@ -1020,20 +936,7 @@ if st.session_state.screen == "game":
                         if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("vis"):
                             st.session_state.action_points -= 1
                             st.session_state.physical_exam_done["vis"] = True
-                            st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                            
-                            if st.session_state.current_case == "laryngitis":
-                                st.session_state.unlocked_clues.append("三凹征")
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿吸气时胸骨上窝、锁骨上窝及肋间隙明显凹陷，即“三凹征”。）\n[VIDEO:three_depressions.mp4]"})
-                            elif st.session_state.current_case == "foreign_body":
-                                st.session_state.unlocked_clues.append("面色发绀")
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿面色口唇发绀，剧烈咳嗽，双手抓喉。）"})
-                            elif st.session_state.current_case == "asthma":
-                                st.session_state.unlocked_clues.append("呼气性呼吸困难")
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿端坐呼吸，呼气相延长，大汗淋漓。）"})
-                            elif st.session_state.current_case == "epiglottitis":
-                                st.session_state.unlocked_clues.extend(["流涎", "拒绝平卧"])
-                                st.session_state.messages.append({"role": "assistant", "content": "（视诊：患儿呈端坐位，流涎明显，拒绝平卧，精神极差。）"})
+                            st.session_state.visual_exam_mode = True # 开启视诊作答模式
                             st.rerun()
                         elif st.session_state.action_points <= 0:
                             st.error("行动点不足！")
@@ -1062,31 +965,74 @@ if st.session_state.screen == "game":
                                     "content": "（警示：患儿因你的触碰极度恐惧，剧烈哭闹挣扎，吸气性喉鸣突然加重，面色更加青紫！你赶紧停止刺激并安抚。）"
                                 })
                                 st.toast("🚨 激惹患儿导致病情加重！", icon="⚠️")
-                                if st.session_state.disease_progress >= 100:
-                                    st.session_state.game_over = True
+                                if st.session_state.disease_progress >= 100: st.session_state.game_over = True
                                     
                             elif st.session_state.current_case == "foreign_body":
-                                # 异物：有收益，但不多
                                 st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                 st.session_state.unlocked_clues.append("呼吸音不对称")
-                                st.session_state.messages.append({
-                                    "role": "assistant", 
-                                    "content": "（触诊：气管居中，语颤减弱。叩诊：右侧呈过清音，提示异物阻塞。）"
-                                })
-                                
+                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：气管居中，语颤减弱。叩诊：右侧呈过清音，提示异物阻塞。）"})
                             elif st.session_state.current_case == "asthma":
-                                # 哮喘：有收益，但不多
                                 st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                                st.session_state.messages.append({
-                                    "role": "assistant", 
-                                    "content": "（触诊：语颤减弱。叩诊：双肺过清音，肺界下移。）"
-                                })
+                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：语颤减弱。叩诊：双肺过清音，肺界下移。）"})
                                 
                             st.rerun()
                         elif st.session_state.action_points <= 0:
                             st.error("行动点不足！")
 
-        if st.session_state.auscultation_mode:
+        # --- 视诊模式界面 ---
+        if st.session_state.get("visual_exam_mode", False):
+            st.warning("👁️ 视诊中：请仔细观察画面，并在下方输入您的判断。")
+            
+            if st.session_state.current_case == "laryngitis":
+                if os.path.exists("three_depressions.mp4"):
+                    st.video("three_depressions.mp4")
+                else:
+                    st.info("[缺少视频：three_depressions.mp4，请脑补胸骨上窝、锁骨上窝凹陷]")
+                clue_name = "三凹征"
+                keywords = ["三凹", "凹陷", "胸骨", "锁骨", "肋间"]
+                prompt_text = "请输入您观察到的体征名称（如：三凹征）："
+            elif st.session_state.current_case == "foreign_body":
+                st.info("[患儿面色口唇发绀，双手抓喉]")
+                clue_name = "面色发绀"
+                keywords = ["紫", "绀", "青"]
+                prompt_text = "患儿的面色和口唇有什么异常？"
+            elif st.session_state.current_case == "asthma":
+                st.info("[患儿端坐呼吸，呼气相延长，大汗淋漓]")
+                clue_name = "呼气性呼吸困难"
+                keywords = ["呼气", "喘", "费力"]
+                prompt_text = "患儿的呼吸呈现出什么特点？"
+            elif st.session_state.current_case == "epiglottitis":
+                st.info("[患儿呈端坐位，流涎明显，拒绝平卧，精神极差]")
+                clue_name = "流涎" 
+                keywords = ["口水", "流涎", "平卧", "躺"]
+                prompt_text = "患儿目前有哪些特殊的姿势和分泌物表现？"
+
+            with st.form(key="visual_exam_form"):
+                user_input = st.text_input(prompt_text)
+                submit = st.form_submit_button("提交判断")
+                if submit:
+                    if not user_input.strip():
+                        st.error("请输入您的判断！")
+                    elif any(kw in user_input for kw in keywords):
+                        st.success(f"✅ 判断正确！患儿呈现出明显的：{clue_name}")
+                        st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                        if clue_name not in st.session_state.unlocked_clues:
+                            st.session_state.unlocked_clues.append(clue_name)
+                        if st.session_state.current_case == "epiglottitis" and "拒绝平卧" not in st.session_state.unlocked_clues:
+                            st.session_state.unlocked_clues.append("拒绝平卧")
+                        st.session_state.score_inquiry += 8
+                        st.session_state.messages.append({"role": "assistant", "content": f"（视诊：患儿表现为 {clue_name}，你迅速记录下这一重要体征。）"})
+                        st.session_state.visual_exam_mode = False
+                        time.sleep(1); st.rerun()
+                    else:
+                        st.error("❌ 观察不够仔细或用词不准确，请再仔细看看画面。")
+            if st.button("⏭️ 放弃作答，结束视诊"):
+                st.session_state.visual_exam_mode = False
+                st.session_state.messages.append({"role": "assistant", "content": "（视诊：你观察了一会儿，但未能明确说出体征名称。）"})
+                st.rerun()
+
+        # --- 听诊模式界面 ---
+        elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
             if os.path.exists(f"static/{case['audio']}"): st.audio(f"static/{case['audio']}", format="audio/mp3")
             st.write("请判断：")
@@ -1102,87 +1048,99 @@ if st.session_state.screen == "game":
                     st.session_state.score_diagnosis += 10
                 st.session_state.auscultation_mode = False
                 st.session_state.auscultation_completed = True; st.rerun()
+
+        # --- 正常聊天与决策界面 ---
         else:
             with st.container(height=400):
                 for msg in st.session_state.messages:
                     render_message(msg["role"], msg["content"])
 
-            if not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "crisis":
-                elapsed = time.time() - st.session_state.crisis_start_time
-                time_left = max(0, 90 - int(elapsed))
-                st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
-                if time_left <= 0:
-                    st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
-                if st.session_state.action_points > 0:
-                    for opt_key, opt_val in case["crisis"].items():
-                        if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
-                            st.session_state.action_points -= 1
-                            st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
-                            st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
-                            st.session_state.disease_progress += opt_val["disease"]
-                            if opt_val["type"] == "correct": st.session_state.crisis_correct_count += 1
-                            else: st.session_state.penalty_log.append(opt_val["label"])
-                            if st.session_state.disease_progress >= 100: st.session_state.game_over = True
-                            st.rerun()
+            if not st.session_state.game_over:
+                current_mode = SCENARIO_DATA[st.session_state.time_period]["mode"]
 
-            elif not st.session_state.game_over and SCENARIO_DATA[st.session_state.time_period]["mode"] == "free":
-                if prompt := st.chat_input("输入问诊或检查..."):
-                    if st.session_state.action_points <= 0:
-                        st.warning("行动点已用完，请进入下一幕。")
-                    else:
-                        st.session_state.action_points -= 1
-                        st.session_state.messages.append({"role": "user", "content": prompt})
-                        
-                        # --- 强化版大模型生成回复 ---
-                        try:
-                            system_prompt = f"""你正在扮演：{case['ai_role']}。
+                if current_mode == "crisis":
+                    elapsed = time.time() - st.session_state.crisis_start_time
+                    time_left = max(0, 90 - int(elapsed))
+                    st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
+                    if time_left <= 0:
+                        st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
+                    if st.session_state.action_points > 0:
+                        for opt_key, opt_val in case["crisis"].items():
+                            if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
+                                st.session_state.action_points -= 1
+                                st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
+                                st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
+                                st.session_state.disease_progress += opt_val["disease"]
+                                if opt_val["type"] == "correct": st.session_state.crisis_correct_count += 1
+                                else: st.session_state.penalty_log.append(opt_val["label"])
+                                if st.session_state.disease_progress >= 100: st.session_state.game_over = True
+                                st.rerun()
+
+                elif current_mode == "free":
+                    if prompt := st.chat_input("输入问诊或检查..."):
+                        if st.session_state.action_points <= 0:
+                            st.warning("行动点已用完，请进入下一幕。")
+                        else:
+                            st.session_state.action_points -= 1
+                            st.session_state.messages.append({"role": "user", "content": prompt})
+                            
+                            try:
+                                system_prompt = f"""你正在扮演：{case['ai_role']}。
 【核心约束】：
 1. 你是一个没有任何医学知识的家长，只能用大白话（口语）交流。
 2. 【极其重要】绝对不要主动罗列症状！医生问什么，你就答什么。
-3. 如果医生问：“孩子咳嗽怎么样的？”、“咳嗽声音什么样？”，你就回答：“像小狗叫一样，空空的”（此时系统会自动给你解锁线索）。
+3. 如果医生询问“咳嗽声音”、“怎么咳的”，你只能回答：“咳得很厉害，声音很怪，空空的”。【绝对禁止】主动说出“像小狗叫”、“拉风箱”等任何具体的比喻词。
 4. 绝对禁止使用专业术语，绝对禁止给诊断结论！你只是个着急的家长。
 5. 每次回复严格控制在40字以内。"""
-                            
-                            api_messages = [
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": prompt}
-                            ]
-                            response = client.chat.completions.create(
-                                model=MODEL_NAME,
-                                messages=api_messages,
-                                temperature=0.3, # 降低温度，减少 AI 放飞自我
-                                max_tokens=100
-                            )
-                            ai_reply = response.choices[0].message.content
-                        except Exception as e:
-                            # 兜底回复
-                            if st.session_state.current_case == "laryngitis":
-                                ai_reply = "医生，她昨晚就开始咳嗽，声音像小狗叫一样，刚才突然喘不上气，我该怎么办啊！"
-                            elif st.session_state.current_case == "foreign_body":
-                                ai_reply = "医生！她刚才吃花生突然咳得整个人弓起来，脸都憋紫了，求您快救救她！"
-                            elif st.session_state.current_case == "asthma":
-                                ai_reply = "医生，她以前也喘过，但这次特别厉害，呼气很费力，您快帮帮她。"
-                            elif st.session_state.current_case == "epiglottitis":
-                                ai_reply = "医生，她一直流口水，一躺下就喘不上气，还发高烧，快救救孩子吧！"
-                            else:
-                                ai_reply = "医生，我真的好担心，求您快帮帮孩子吧！"
+                                api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+                                response = client.chat.completions.create(model=MODEL_NAME, messages=api_messages, temperature=0.3, max_tokens=100)
+                                ai_reply = response.choices[0].message.content
+                            except Exception as e:
+                                if st.session_state.current_case == "laryngitis": ai_reply = "医生，她咳嗽得很厉害，声音挺怪的，您快给看看！"
+                                elif st.session_state.current_case == "foreign_body": ai_reply = "医生！她刚才吃花生突然咳得整个人弓起来，脸都憋紫了，求您快救救她！"
+                                elif st.session_state.current_case == "asthma": ai_reply = "医生，她以前也喘过，但这次特别厉害，呼气很费力，您快帮帮她。"
+                                elif st.session_state.current_case == "epiglottitis": ai_reply = "医生，她一直流口水，一躺下就喘不上气，还发高烧，快救救孩子吧！"
+                                else: ai_reply = "医生，我真的好担心，求您快帮帮孩子吧！"
 
-                        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                            st.session_state.messages.append({"role": "assistant", "content": ai_reply})
 
-                        # --- 智能线索解锁逻辑 (意图匹配) ---
-                        match_text = prompt # 只匹配医生的提问
-                        
-                        for clue in case["clues"]:
-                            if clue not in st.session_state.unlocked_clues:
-                                # 调用我们写好的智能判定函数
-                                if check_clue_trigger(clue, match_text):
-                                    st.session_state.unlocked_clues.append(clue)
-                                    st.session_state.score_inquiry += 8
-                                    st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                                    st.toast(f"💡 问诊发现线索：{clue}", icon="🔍")
+                            match_text = prompt + " " + ai_reply
+                            for clue in case["clues"]:
+                                if clue not in st.session_state.unlocked_clues:
+                                    if check_clue_trigger(clue, match_text):
+                                        st.session_state.unlocked_clues.append(clue)
+                                        st.session_state.score_inquiry += 8
+                                        st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                        st.toast(f"💡 问诊发现线索：{clue}", icon="🔍")
+                            st.rerun()
 
-                        st.rerun()
+                elif current_mode == "decision":
+                    st.info("🩺 请根据目前收集到的线索，给出您的初步诊断：")
+                    if not st.session_state.diagnosis_processed:
+                        for opt_key, opt_val in case["diagnosis"].items():
+                            if st.button(opt_val, key=f"diag_{opt_key}", use_container_width=True):
+                                st.session_state.diagnosis_processed = True
+                                st.session_state.diagnosis_made = opt_key
+                                if opt_val == case["disease"]:
+                                    st.session_state.score_diagnosis += 15
+                                    st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！这是{case['disease']}。"})
+                                else:
+                                    st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
+                                    st.session_state.penalty_log.append(f"误诊为{opt_val}")
+                                    st.session_state.messages.append({"role": "assistant", "content": "❌ 误诊！病情加重。"})
+                                # 自动进入第三幕
+                                st.session_state.time_period = 3
+                                st.session_state.action_points = 5
+                                st.session_state.disease_progress += 10
+                                st.rerun()
+                    else:
+                        if st.button("▶️ 诊断已给出，进入第三幕", use_container_width=True):
+                            st.session_state.time_period = 3
+                            st.session_state.action_points = 5
+                            st.session_state.disease_progress += 10
+                            st.rerun()
 
+    # ================= 结案复盘 =================
     if st.session_state.game_over:
         st.divider(); st.header("🩺 带教老师复盘")
         if st.session_state.final_score == 0:
@@ -1196,17 +1154,12 @@ if st.session_state.screen == "game":
         if not st.session_state.record_saved:
             check_achievements(case, st.session_state.current_case)
             save_record({
-                "player_id": st.session_state.player_id,
-                "player_name": st.session_state.player_name,
-                "case_id": st.session_state.current_case,
-                "case_name": case["name"],
-                "disease": case["disease"],
-                "mode": st.session_state.game_mode,
+                "player_id": st.session_state.player_id, "player_name": st.session_state.player_name,
+                "case_id": st.session_state.current_case, "case_name": case["name"],
+                "disease": case["disease"], "mode": st.session_state.game_mode,
                 "final_score": st.session_state.final_score,
-                "score_inquiry": st.session_state.score_inquiry,
-                "score_diagnosis": st.session_state.score_diagnosis,
-                "score_emergency": st.session_state.score_emergency,
-                "score_empathy": st.session_state.score_empathy,
+                "score_inquiry": st.session_state.score_inquiry, "score_diagnosis": st.session_state.score_diagnosis,
+                "score_emergency": st.session_state.score_emergency, "score_empathy": st.session_state.score_empathy,
                 "disease_progress": st.session_state.disease_progress,
                 "survived": 1 if st.session_state.disease_progress < 100 else 0,
                 "mistakes": json.dumps(st.session_state.penalty_log, ensure_ascii=False),
@@ -1218,10 +1171,8 @@ if st.session_state.screen == "game":
         st.info(f"### {st.session_state.final_title}\n最终得分：{st.session_state.final_score} / 100")
         st.subheader("📊 个人能力雷达图")
         fig = go.Figure(go.Scatterpolar(
-            r=[min(100, st.session_state.score_inquiry * 3),
-               min(100, st.session_state.score_diagnosis * 2),
-               min(100, st.session_state.score_emergency * 2),
-               min(100, st.session_state.score_empathy * 2)],
+            r=[min(100, st.session_state.score_inquiry * 3), min(100, st.session_state.score_diagnosis * 2),
+               min(100, st.session_state.score_emergency * 2), min(100, st.session_state.score_empathy * 2)],
             theta=['问诊', '诊断', '急救', '沟通'], fill='toself'))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
         st.plotly_chart(fig, use_container_width=True)
