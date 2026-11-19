@@ -648,17 +648,23 @@ if st.session_state.screen == "difficulty_select":
 
 # ================= 过渡：开场视频页 =================
 if st.session_state.screen == "intro":
+    # 初始化静音状态（默认静音，保证画面能自动播放）
+    if "intro_muted" not in st.session_state:
+        st.session_state.intro_muted = True
+
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
         [data-testid="stHeader"] { display: none !important; }
         .stApp { background-color: #000 !important; }
         .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+        
         .bottom-mask {
             position: fixed; bottom: 0; left: 0; width: 100vw; height: 35vh;
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
             z-index: 2; pointer-events: none;
         }
+        
         div.stButton { position: relative; z-index: 100; }
         div.stButton > button {
             background: rgba(0, 0, 0, 0.5) !important; backdrop-filter: blur(10px);
@@ -676,12 +682,16 @@ if st.session_state.screen == "intro":
     </style>
     """, unsafe_allow_html=True)
 
+    # 根据状态决定是否添加 muted
+    muted_attr = "muted" if st.session_state.intro_muted else ""
+    
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
+        
         bg_html = f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none;">
-            <video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
+            <video autoplay {muted_attr} loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
                 <source src="data:video/mp4;base64,{video_b64}" type="video/mp4">
             </video>
         </div>
@@ -691,18 +701,35 @@ if st.session_state.screen == "intro":
     else:
         st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
 
+    # 中间 UI 层：下移
     _, col_mid, _ = st.columns([1, 1.2, 1])
     with col_mid:
-        st.markdown('<div style="height: 75vh;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height: 65vh;"></div>', unsafe_allow_html=True)
+        
         st.markdown(
             '<div style="text-align: center; font-size: 20px; font-weight: bold; color: rgba(255,255,255,0.7) !important; '
             'text-shadow: 1px 1px 4px rgba(0,0,0,0.8); margin-bottom: 20px; letter-spacing: 2px; position: relative; z-index: 10;">'
             '🎬 急诊室画面</div>', 
             unsafe_allow_html=True
         )
+        
         if st.button("▶️ 医生，我准备好了，开始接诊！", use_container_width=True):
             st.session_state.screen = "game"
             st.rerun()
+            
+        # 右下角的音量开关按钮
+        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+        _, col_vol, _ = st.columns([1, 1, 1])
+        with col_vol:
+            if st.session_state.intro_muted:
+                if st.button("🔇 开启声音", use_container_width=True):
+                    st.session_state.intro_muted = False
+                    st.rerun()
+            else:
+                if st.button("🔊 关闭声音", use_container_width=True):
+                    st.session_state.intro_muted = True
+                    st.rerun()
+                    
     st.stop()
 
 # ================= 11. 成就殿堂 =================
