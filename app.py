@@ -658,54 +658,63 @@ if st.session_state.screen == "intro":
     <style>
         [data-testid="stSidebar"] { display: none !important; }
         [data-testid="stHeader"] { display: none !important; }
-        .stApp { background-color: #000 !important; overflow: hidden; }
+        .stApp { background-color: #000 !important; }
         .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
         
-        /* 按钮悬浮在最上层 */
-        .stButton { position: relative; z-index: 1000; }
-        .stButton>button {
-            background: rgba(255, 255, 255, 0.15) !important;
+        /* 按钮层级与样式 */
+        div.stButton {
+            position: relative;
+            z-index: 100;
+        }
+        div.stButton > button {
+            background: rgba(0, 0, 0, 0.6) !important; 
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            color: white !important;
-            font-size: 18px !important;
+            border: 2px solid rgba(255, 255, 255, 0.4) !important;
             padding: 15px 30px !important;
             border-radius: 30px !important;
             transition: all 0.3s ease !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
         }
-        .stButton>button:hover {
-            background: rgba(255, 255, 255, 0.3) !important;
+        div.stButton > button:hover {
+            background: rgba(0, 0, 0, 0.8) !important;
+            border-color: rgba(255, 255, 255, 0.8) !important;
             transform: scale(1.05);
+        }
+        /* 强制覆盖全局深色文字，让按钮和标题变成纯白 */
+        div.stButton > button p {
+            color: #ffffff !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # 2. 将本地视频转为 Base64 嵌入背景
+    # 2. 原生 HTML 渲染视频，z-index 改为 1，确保不被底部背景盖住
     if os.path.exists("intro_er.mp4"):
         with open("intro_er.mp4", "rb") as f:
             video_b64 = base64.b64encode(f.read()).decode()
         
-        # 全屏视频背景 HTML (autoplay muted loop playsinline 确保自动播放，无控制条)
         bg_html = f"""
-        <video autoplay muted loop playsinline style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: -1; opacity: 0.8;">
-            <source src="data:video/mp4;base64,{video_b64}" type="video/mp4">
-        </video>
+        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none;">
+            <video autoplay muted loop playsinline style="width: 100%; height: 100%; object-fit: cover;">
+                <source src="data:video/mp4;base64,{video_b64}" type="video/mp4">
+            </video>
+        </div>
         """
         st.markdown(bg_html, unsafe_allow_html=True)
     else:
-        st.warning("（此处缺少开场视频文件 intro_er.mp4）")
+        st.error("未找到视频文件 intro_er.mp4，请检查文件是否在项目根目录。")
 
-    # 3. 覆盖在视频上的 UI 元素
+    # 3. UI 层：z-index 必须比视频高 (这里用了 z-index: 10)
     _, col_mid, _ = st.columns([1, 1.5, 1])
     with col_mid:
         # 占位，把按钮推到偏下的位置
-        st.markdown('<div style="height: 55vh;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height: 45vh; position: relative; z-index: 10;"></div>', unsafe_allow_html=True)
         
-        # 标题
+        # 标题，强制白色
         st.markdown(
-            '<div style="text-align: center; font-size: 48px; font-weight: 900; color: white; '
-            'text-shadow: 2px 2px 8px rgba(0,0,0,0.8); margin-bottom: 30px; letter-spacing: 5px;">'
+            '<div style="text-align: center; font-size: 48px; font-weight: 900; color: #ffffff !important; '
+            'text-shadow: 2px 2px 8px rgba(0,0,0,0.8); margin-bottom: 30px; letter-spacing: 5px; position: relative; z-index: 10;">'
             '🎬 急诊室画面</div>', 
             unsafe_allow_html=True
         )
@@ -719,7 +728,6 @@ if st.session_state.screen == "intro":
             st.rerun()
             
     st.stop()
-
 # ================= 11. 成就殿堂 =================
 if st.session_state.screen == "achievements":
     st.markdown('<div style="text-align:center; font-size:42px; font-weight:900; color:#00b4d8; margin:20px 0;">🏅 成就殿堂</div>', unsafe_allow_html=True)
