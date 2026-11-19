@@ -1051,17 +1051,37 @@ if st.session_state.screen == "game":
                         if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("palp"):
                             st.session_state.action_points -= 1
                             st.session_state.physical_exam_done["palp"] = True
-                            st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                             
-                            if st.session_state.current_case == "laryngitis":
-                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：颈部无明显红肿，双肺呼吸音粗。叩诊：清音。）"})
+                            # --- 根据不同疾病设定触诊/叩诊的结果 ---
+                            if st.session_state.current_case in ["laryngitis", "epiglottitis"]:
+                                # 喉炎和会厌炎：严重惩罚，加重病情
+                                st.session_state.disease_progress = min(100, st.session_state.disease_progress + 15)
+                                st.session_state.penalty_log.append("不必要的触诊激惹患儿")
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": "（警示：患儿因你的触碰极度恐惧，剧烈哭闹挣扎，吸气性喉鸣突然加重，面色更加青紫！你赶紧停止刺激并安抚。）"
+                                })
+                                st.toast("🚨 激惹患儿导致病情加重！", icon="⚠️")
+                                if st.session_state.disease_progress >= 100:
+                                    st.session_state.game_over = True
+                                    
                             elif st.session_state.current_case == "foreign_body":
+                                # 异物：有收益，但不多
+                                st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                 st.session_state.unlocked_clues.append("呼吸音不对称")
-                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：气管居中，语颤减弱。叩诊：右侧呈过清音，提示异物阻塞。）"})
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": "（触诊：气管居中，语颤减弱。叩诊：右侧呈过清音，提示异物阻塞。）"
+                                })
+                                
                             elif st.session_state.current_case == "asthma":
-                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：语颤减弱。叩诊：双肺过清音，肺界下移。）"})
-                            elif st.session_state.current_case == "epiglottitis":
-                                st.session_state.messages.append({"role": "assistant", "content": "（触诊：颈前区拒按，下颌淋巴结肿大。注意：严禁强行压舌检查！）"})
+                                # 哮喘：有收益，但不多
+                                st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                st.session_state.messages.append({
+                                    "role": "assistant", 
+                                    "content": "（触诊：语颤减弱。叩诊：双肺过清音，肺界下移。）"
+                                })
+                                
                             st.rerun()
                         elif st.session_state.action_points <= 0:
                             st.error("行动点不足！")
