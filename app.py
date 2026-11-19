@@ -355,7 +355,8 @@ def render_message(role: str, content: str):
     if role == "user":
         bg = "#95ec69" if not night else "#3eb575"
         fg = "#111111" if not night else "#ffffff"
-        av = avatar_html("static/doctor.png", "👨‍⚕️", "#4a90d9")
+        # 👇 这里修改医生的头像路径
+        av = avatar_html("doctor.png", "👨‍⚕️", "#4a90d9") 
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-end; align-items:flex-start; margin:8px 0;">
             <div style="background:{bg}; color:{fg}; padding:10px 14px; border-radius:14px;
@@ -368,7 +369,8 @@ def render_message(role: str, content: str):
     else:
         bg = "#ffffff" if not night else "rgba(255,255,255,0.12)"
         fg = "#111111" if not night else "#e2e8f0"
-        av = avatar_html("static/mom.png", "👩", "#f6a623")
+        # 👇 这里修改妈妈的头像路径
+        av = avatar_html("mom.png", "👩", "#f6a623")
         st.markdown(f"""
         <div style="display:flex; justify-content:flex-start; align-items:flex-start; margin:8px 0;">
             <div style="margin-right:8px;">{av}</div>
