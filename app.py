@@ -647,12 +647,12 @@ if st.session_state.screen == "game":
             st.session_state.screen = "start"; st.rerun()
 
     # ================= 右侧线索夹 & 鉴别板 =================
-    with col_right:
-                st.subheader("📋 鉴别诊断板")
+   with col_right:
+        st.subheader("📋 鉴别诊断板")
         st.caption("记录你的临床思路（可多选）：")
         hyp_options = list(case["diagnosis"].values())
         
-        # 加入了中文 placeholder，修复英文问题
+        # 加入了中文 placeholder
         st.session_state.my_hypotheses = st.multiselect(
             "怀疑的疾病", 
             hyp_options, 
