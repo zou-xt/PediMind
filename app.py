@@ -983,38 +983,89 @@ if st.session_state.screen == "game":
         st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("🎓 生成专属虚拟医师执照")
-        if st.button("立即生成证书"):
+         if st.button("立即生成证书"):
             try:
-                img = Image.new('RGB', (800, 600), color = (255, 255, 255))
+                # 1. 创建竖版画布 (类似真实证书比例)
+                W, H = 800, 1100
+                img = Image.new('RGB', (W, H), color=(255, 255, 255))
                 d = ImageDraw.Draw(img)
-                d.rectangle([20, 20, 780, 580], outline=(0, 180, 216), width=5)
                 
-                font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
-                if not os.path.exists(font_path): font_path = "arial.ttf"
-                try:
-                    font_title = ImageFont.truetype(font_path, 40)
-                    font_text = ImageFont.truetype(font_path, 24)
-                except:
-                    font_title = font_text = None
+                # 2. 画双层边框
+                d.rectangle([15, 15, W-15, H-15], outline=(100, 150, 200), width=6)
+                d.rectangle([25, 25, W-25, H-25], outline=(150, 200, 230), width=2)
                 
-                d.text((400, 100), "虚拟医师资格认证", fill=(0, 180, 216), font=font_title, anchor="mm")
-                d.text((400, 200), f"兹证明 {st.session_state.player_name} 医生", fill=(0, 0, 0), font=font_text, anchor="mm")
-                d.text((400, 250), f"在《急诊风云》儿科急救演练中", fill=(0, 0, 0), font=font_text, anchor="mm")
-                d.text((400, 300), f"成功处理了「{case['disease']}」病例", fill=(0, 0, 0), font=font_text, anchor="mm")
-                d.text((400, 380), f"最终得分：{st.session_state.final_score} / 100", fill=(230, 57, 70), font=font_text, anchor="mm")
-                d.text((400, 420), f"获得称号：{st.session_state.final_title}", fill=(230, 57, 70), font=font_text, anchor="mm")
-                d.text((400, 520), "PediMind 智能体大赛组委会 认证", fill=(100, 100, 100), font=font_text, anchor="mm")
+                # 3. 加载字体 (兼容 Linux 云端、Windows 本地、Mac)
+                font_paths = [
+                    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", # Streamlit Cloud (Linux)
+                    "C:/Windows/Fonts/msyh.ttc",                    # Windows (微软雅黑)
+                    "/System/Library/Fonts/PingFang.ttc"            # Mac
+                ]
+                font_title = font_text = font_bold = None
+                for fp in font_paths:
+                    if os.path.exists(fp):
+                        font_title = ImageFont.truetype(fp, 50)
+                        font_text = ImageFont.truetype(fp, 28)
+                        font_bold = ImageFont.truetype(fp, 32)
+                        break
                 
-                qr = qrcode.make(f"http://localhost:8501/?pid={st.session_state.player_id}")
-                qr = qr.resize((100, 100))
-                img.paste(qr, (640, 450))
+                if not font_title:
+                    st.error("未找到中文字体，生成可能乱码。请确保云端有 packages.txt 并包含 fonts-wqy-zenhei")
+                    font_title = font_text = font_bold = ImageFont.load_default()
+
+                # 4. 绘制标题
+                d.text((W//2, 100), "虚拟医师执业证书", fill=(0, 0, 0), font=font_title, anchor="mm")
+                d.text((W//2, 160), "PediMind Medical Certificate", fill=(150, 150, 150), font=font_text, anchor="mm")
                 
+                # 5. 绘制左侧信息面板
+                info_x = 80
+                start_y = 260
+                line_gap = 55
+                
+                info_data = [
+                    ("姓　　名：", st.session_state.player_name),
+                    ("性　　别：", "男/女"), # 可以随机或固定
+                    ("执业级别：", "执业医师"),
+                    ("执业类别：", "临床"),
+                    ("执业范围：", "儿科专业"),
+                    ("任职资格：", st.session_state.final_title.replace("🏆 ", "").replace("🌟 ", "").replace("📚 ", "")),
+                    ("病例挑战：", case['name']),
+                    ("最终得分：", f"{st.session_state.final_score} 分"),
+                    ("证书编号：", f"Pedi-{str(uuid.uuid4())[:8].upper()}"),
+                ]
+                
+                for i, (label, value) in enumerate(info_data):
+                    y = start_y + i * line_gap
+                    d.text((info_x, y), label, fill=(80, 80, 80), font=font_text)
+                    d.text((info_x + 180, y), str(value), fill=(0, 0, 0), font=font_bold)
+                    
+                # 6. 右上角贴头像
+                if os.path.exists("static/doctor.png"):
+                    avatar = Image.open("static/doctor.png").convert("RGBA")
+                    avatar = avatar.resize((150, 150))
+                    # 简单裁切为圆形（可选，这里为了不报错直接用方形粘贴）
+                    img.paste(avatar, (W - 250, 200), avatar)
+                
+                # 7. 底部二维码和发证机关
+                qr_data = f"http://localhost:8501/?pid={st.session_state.player_id}"
+                qr = qrcode.make(qr_data)
+                qr = qr.resize((160, 160))
+                img.paste(qr, (W // 2 - 80, 750))
+                
+                d.text((W//2, 950), "签发机关：PediMind 虚拟医学教育中心", fill=(50, 50, 50), font=font_text, anchor="mm")
+                d.text((W//2, 1000), f"签发日期：{datetime.now().strftime('%Y年%m月%d日')}", fill=(50, 50, 50), font=font_text, anchor="mm")
+
+                # 8. 输出
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 byte_im = buf.getvalue()
                 
                 st.image(byte_im, caption="长按或右键保存你的专属证书", use_container_width=True)
-                st.download_button("📥 下载证书", data=byte_im, file_name=f"PediMind_Cert_{st.session_state.player_name}.png", mime="image/png")
+                st.download_button(
+                    label="📥 下载高清证书", 
+                    data=byte_im, 
+                    file_name=f"PediMind_Cert_{st.session_state.player_name}.png", 
+                    mime="image/png"
+                )
             except Exception as e:
                 st.error(f"证书生成失败：{e}")
 
