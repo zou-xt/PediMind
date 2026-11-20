@@ -24,12 +24,13 @@ BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 四大预设病例 (已去剧透化) =================
+# ================= 2. 四大预设病例 (新增动态头像) =================
 CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
         "description": "深夜急诊，患儿突发呼吸困难，家长极度焦虑。",
         "opening_line": "医生！您快看看我家孩子！突然就这样了，我快吓死了！",
+        "avatar": "static/mom.png", # 🌟 新增家属头像配置
         "audio": "stridor.mp3",
         "clues": ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "白天感冒史", "三凹征"],
         "ai_role": "2岁急性喉炎患儿的妈妈。极度焦虑、自责。",
@@ -45,6 +46,7 @@ CASES_CONFIG = {
         "name": "1岁患儿的剧烈呛咳", "disease": "气道异物", "patient": "童童，1岁8个月，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "进食花生后突发剧烈呛咳，气道部分梗阻，生死一线。",
         "opening_line": "医生！快救救他！刚才还好好的，突然就这样了！",
+        "avatar": "static/mom.png",
         "audio": "wheezing.mp3",
         "clues": ["进食呛咳史", "剧烈呛咳", "呼吸音不对称", "面色发绀"],
         "ai_role": "1岁气道异物患儿的妈妈。极度恐慌、语无伦次。",
@@ -60,6 +62,7 @@ CASES_CONFIG = {
         "name": "4岁患儿的反复喘息", "disease": "支气管哮喘急性发作", "patient": "安安，4岁，女", "difficulty": "⭐⭐⭐",
         "description": "既往哮喘病史，本次急性发作，需紧急平喘。",
         "opening_line": "医生，她突然喘得很厉害，您快帮帮她！",
+        "avatar": "static/mom.png",
         "audio": "wheezing.mp3",
         "clues": ["既往哮喘史", "过敏史", "呼气性呼吸困难", "双肺哮鸣音"],
         "ai_role": "4岁哮喘患儿的妈妈。疲惫、担忧。",
@@ -75,6 +78,7 @@ CASES_CONFIG = {
         "name": "3岁患儿的高热与流涎", "disease": "急性会厌炎", "patient": "乐乐，3岁，男", "difficulty": "⭐⭐⭐⭐⭐",
         "description": "高危气道急症，患儿拒绝平卧，严禁强行查体。",
         "opening_line": "医生，孩子发高烧，现在状态特别差，快救救她吧！",
+        "avatar": "static/mom.png",
         "audio": "stridor.mp3",
         "clues": ["高热", "流涎", "吞咽困难", "拒绝平卧", "无犬吠样咳嗽"],
         "ai_role": "3岁会厌炎患儿的妈妈。极度恐惧。",
@@ -307,7 +311,8 @@ def load_avatar(path: str) -> str:
     with open(path, "rb") as f: b64 = base64.b64encode(f.read()).decode()
     return f"data:image/{mime};base64,{b64}"
 
-def render_message(role: str, content: str):
+# 🌟 修改：接收 case 配置，动态渲染头像
+def render_message(role: str, content: str, case: dict = None):
     safe = html.escape(str(content)).replace("\n", "<br>")
     night = st.session_state.theme == "night"
     AVATAR_SIZE = "38px"
@@ -322,7 +327,8 @@ def render_message(role: str, content: str):
         st.markdown(f'<div style="display:flex; justify-content:flex-end; align-items:flex-start; margin:8px 0;"><div style="background:{bg}; color:{fg}; padding:10px 14px; border-radius:14px; border-top-right-radius:3px; max-width:75%; word-break:break-word; font-size:15px; line-height:1.6; box-shadow:0 1px 2px rgba(0,0,0,0.12);">{safe}</div><div style="margin-left:8px;">{av}</div></div>', unsafe_allow_html=True)
     else:
         bg = "#ffffff" if not night else "rgba(255,255,255,0.12)"; fg = "#111111" if not night else "#e2e8f0"
-        av = avatar_html("static/mom.png", "👩", "#f6a623")
+        patient_avatar = case.get("avatar", "static/mom.png") if case else "static/mom.png"
+        av = avatar_html(patient_avatar, "👩", "#f6a623")
         st.markdown(f'<div style="display:flex; justify-content:flex-start; align-items:flex-start; margin:8px 0;"><div style="margin-right:8px;">{av}</div><div style="background:{bg}; color:{fg}; padding:10px 14px; border-radius:14px; border-top-left-radius:3px; max-width:75%; word-break:break-word; font-size:15px; line-height:1.6; box-shadow:0 1px 2px rgba(0,0,0,0.12);">{safe}</div></div>', unsafe_allow_html=True)
 
 def render_monitor(disease_progress: int):
@@ -459,7 +465,7 @@ if st.session_state.screen == "case_select":
     for case_id, case in CASES_CONFIG.items():
         cols = st.columns([3, 1])
         with cols[0]:
-            # 👇 已修复：去掉了这里的疾病名称剧透
+            # 去掉疾病名称剧透
             st.markdown(f'<div class="case-card"><div style="font-size: 24px; font-weight: bold; color: #00b4d8; margin-bottom: 10px;">📁 {case["name"]}</div><div style="font-size: 14px; margin-bottom: 5px;"><b>患儿：</b>{case["patient"]}</div><div style="font-size: 14px; color: #e63946; margin-bottom: 5px;"><b>难度：</b>{case["difficulty"]}</div><div style="font-size: 13px; font-style: italic; margin-top: 10px;">{case["description"]}</div></div>', unsafe_allow_html=True)
         with cols[1]:
             st.markdown("<br><br>", unsafe_allow_html=True)
@@ -486,7 +492,7 @@ if st.session_state.screen == "achievements":
     c1, c2, c3 = st.columns(3); c1.metric("成就总数", total); c2.metric("已解锁", got); c3.metric("完成度", f"{(got/total*100 if total else 0):.0f}%")
     st.progress(min(1.0, got / total) if total else 0); st.divider()
     
-    # 👇 已修复：去掉了这里的疾病名称剧透
+    # 去掉疾病名称剧透
     tab_names = ["🌐 通用成就"] + [f"📁 {CASES_CONFIG[cid]['name']}" for cid in CASES_CONFIG]
     tabs = st.tabs(tab_names)
     with tabs[0]: render_achievement_grid(GLOBAL_ACHIEVEMENTS, "global")
@@ -529,6 +535,7 @@ if st.session_state.screen == "game":
         case.setdefault("diagnosis", {"A": case["disease"], "B": "其他疾病1", "C": "其他疾病2", "D": "其他疾病3"})
         case.setdefault("crisis", {"A": {"label": "正确操作", "type": "correct", "disease": -30, "reply": "好转"}, "B": {"label": "错误操作", "type": "harmful", "disease": 30, "reply": "恶化"}})
         case.setdefault("audio", "wheezing.mp3")
+        case.setdefault("avatar", "static/mom.png")
     else:
         case = CASES_CONFIG[st.session_state.current_case]
     
@@ -596,7 +603,6 @@ if st.session_state.screen == "game":
 
     with st.sidebar:
         st.markdown("---")
-        # 👇 已修复：去掉了侧边栏的疾病名称剧透
         st.markdown(f"### 🩺 病例：{case['name']}")
         render_sidebar_achievements(st.session_state.current_case)
 
@@ -845,7 +851,9 @@ if st.session_state.screen == "game":
 
         else:
             with st.container(height=400):
-                for msg in st.session_state.messages: render_message(msg["role"], msg["content"])
+                for msg in st.session_state.messages: 
+                    # 🌟 传入 case 以渲染动态头像
+                    render_message(msg["role"], msg["content"], case)
 
             if not st.session_state.game_over:
                 current_mode = SCENARIO_DATA[st.session_state.time_period]["mode"]
@@ -893,10 +901,24 @@ if st.session_state.screen == "game":
                             
                             is_furious = st.session_state.trust_score <= 15
                             cold_words = ["闭嘴", "烦死了", "别吵", "赶紧的", "少废话", "按我说的做", "滚", "出去", "别哭了"]
+                            
+                            # 🌟 检测是否在问废话
+                            medical_keywords = ["疼", "痛", "咳", "喘", "烧", "吃", "喝", "拉", "吐", "睡", "精神", "怎么", "多久", "什么", "哪", "时", "检查", "听", "看", "摸", "病", "症", "大小便", "颜色", "呼吸", "胸口"]
+                            is_chitchat = not any(k in prompt for k in medical_keywords) and len(prompt) > 2
+                            
                             if any(w in prompt for w in cold_words):
                                 st.session_state.trust_score -= 30
                                 st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
                                 if check_medical_dispute(): st.rerun()
+                            
+                            elif is_chitchat:
+                                # 🌟 触发闲聊拦截
+                                st.session_state.trust_score -= 5
+                                st.session_state.penalty_log.append("问诊时废话连篇")
+                                st.session_state.messages.append({"role": "assistant", "content": "（家属急得直跺脚）：“医生！都火烧眉毛了您怎么还有心思问这个！求您快看看孩子吧！”"})
+                                st.session_state.disease_progress += 2 
+                                if check_medical_dispute(): st.rerun()
+                                
                             else:
                                 try:
                                     if is_furious:
@@ -911,12 +933,14 @@ if st.session_state.screen == "game":
 2. 【语气生动】用极其口语化、大白话的方式回答，要带出焦急的情绪（多用“哎呀医生”、“急死我了”、“我也不懂啊”等词）。
 3. 【细节化描述】如果医生问“吃了什么”，不要干巴巴地说“米饭炒菜”，要说：“就正常吃了点家常菜和水果啊医生，难道是吃坏东西了吗？”
 4. 【绝对不剧透】不许主动说出你的核心线索（比如“小狗叫”），必须等医生具体问到那个症状你再答。绝对禁止使用专业术语和给出诊断！
-5. 【字数限制】严格控制在50字以内。"""
+5. 【拒绝闲聊】如果医生问与病情无关的废话，绝对不要顺着聊！直接催促他赶紧看病！
+6. 【字数限制】严格控制在50字以内。"""
                                     
                                     api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
                                     response = client.chat.completions.create(model=MODEL_NAME, messages=api_messages, temperature=0.4, max_tokens=120)
                                     ai_reply = response.choices[0].message.content
-                                except: ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
+                                except: 
+                                    ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
 
                                 st.session_state.messages.append({"role": "assistant", "content": ai_reply})
                                 match_text = prompt + " " + ai_reply
@@ -982,11 +1006,10 @@ if st.session_state.screen == "game":
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
         st.plotly_chart(fig, use_container_width=True)
 
-        # 注意下面这两行的缩进，确保它们和上面的 st.info、st.plotly_chart 是左对齐的（通常是8个空格）
         st.subheader("🎓 生成专属虚拟医师执照")
         if st.button("立即生成证书"):
             try:
-                # 1. 创建竖版画布 (类似真实证书比例)
+                # 1. 创建竖版画布
                 W, H = 800, 1100
                 img = Image.new('RGB', (W, H), color=(255, 255, 255))
                 d = ImageDraw.Draw(img)
