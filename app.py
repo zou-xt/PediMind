@@ -648,15 +648,35 @@ if st.session_state.screen == "game":
 
     # ================= 右侧线索夹 & 鉴别板 =================
     with col_right:
-        st.subheader("📋 鉴别诊断板")
-        st.caption("记录你的临床思路：")
+                st.subheader("📋 鉴别诊断板")
+        st.caption("记录你的临床思路（可多选）：")
         hyp_options = list(case["diagnosis"].values())
+        
+        # 加入了中文 placeholder，修复英文问题
         st.session_state.my_hypotheses = st.multiselect(
-            "怀疑的疾病（可多选）", 
+            "怀疑的疾病", 
             hyp_options, 
             default=st.session_state.my_hypotheses,
+            placeholder="点击勾选你怀疑的疾病...",
             label_visibility="collapsed"
         )
+        
+        # 动态临床反馈逻辑
+        if len(st.session_state.my_hypotheses) == 0:
+            st.caption("💡 *建议先勾选 1-2 个最怀疑的疾病。*")
+        elif len(st.session_state.my_hypotheses) > 2:
+            st.warning("⚠️ 怀疑的疾病太多了，请结合查体线索聚焦！")
+        else:
+            st.info("💡 **当前思路：** 你正在验证上述怀疑，请继续寻找证据（问诊/查体）。")
+            
+        # 结合具体病例给出极具针对性的提示
+        if case.get("disease") in st.session_state.my_hypotheses:
+            if st.session_state.current_case == "laryngitis" and "三凹征" in st.session_state.unlocked_clues:
+                st.success("✅ 线索吻合：你已经发现了三凹征，极大概率是这个病。")
+            elif st.session_state.current_case == "epiglottitis" and "流涎" in st.session_state.unlocked_clues:
+                st.success("✅ 线索吻合：流涎+端坐位，高度警惕！")
+            elif st.session_state.current_case == "foreign_body" and "进食呛咳史" in st.session_state.unlocked_clues:
+                st.success("✅ 线索吻合：明确有呛咳史，注意气道梗阻。")
         
         st.divider()
         st.subheader("🔍 线索夹")
