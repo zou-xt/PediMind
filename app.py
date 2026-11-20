@@ -24,13 +24,13 @@ BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 四大预设病例 (新增动态头像) =================
+# ================= 2. 四大预设病例 =================
 CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
         "description": "深夜急诊，患儿突发呼吸困难，家长极度焦虑。",
         "opening_line": "医生！您快看看我家孩子！突然就这样了，我快吓死了！",
-        "avatar": "static/mom.png", # 🌟 新增家属头像配置
+        "avatar": "static/mom.png",
         "audio": "stridor.mp3",
         "clues": ["犬吠样咳嗽", "夜间加重", "吸气性喉鸣", "白天感冒史", "三凹征"],
         "ai_role": "2岁急性喉炎患儿的妈妈。极度焦虑、自责。",
@@ -311,7 +311,6 @@ def load_avatar(path: str) -> str:
     with open(path, "rb") as f: b64 = base64.b64encode(f.read()).decode()
     return f"data:image/{mime};base64,{b64}"
 
-# 🌟 修改：接收 case 配置，动态渲染头像
 def render_message(role: str, content: str, case: dict = None):
     safe = html.escape(str(content)).replace("\n", "<br>")
     night = st.session_state.theme == "night"
@@ -465,7 +464,6 @@ if st.session_state.screen == "case_select":
     for case_id, case in CASES_CONFIG.items():
         cols = st.columns([3, 1])
         with cols[0]:
-            # 去掉疾病名称剧透
             st.markdown(f'<div class="case-card"><div style="font-size: 24px; font-weight: bold; color: #00b4d8; margin-bottom: 10px;">📁 {case["name"]}</div><div style="font-size: 14px; margin-bottom: 5px;"><b>患儿：</b>{case["patient"]}</div><div style="font-size: 14px; color: #e63946; margin-bottom: 5px;"><b>难度：</b>{case["difficulty"]}</div><div style="font-size: 13px; font-style: italic; margin-top: 10px;">{case["description"]}</div></div>', unsafe_allow_html=True)
         with cols[1]:
             st.markdown("<br><br>", unsafe_allow_html=True)
@@ -492,7 +490,6 @@ if st.session_state.screen == "achievements":
     c1, c2, c3 = st.columns(3); c1.metric("成就总数", total); c2.metric("已解锁", got); c3.metric("完成度", f"{(got/total*100 if total else 0):.0f}%")
     st.progress(min(1.0, got / total) if total else 0); st.divider()
     
-    # 去掉疾病名称剧透
     tab_names = ["🌐 通用成就"] + [f"📁 {CASES_CONFIG[cid]['name']}" for cid in CASES_CONFIG]
     tabs = st.tabs(tab_names)
     with tabs[0]: render_achievement_grid(GLOBAL_ACHIEVEMENTS, "global")
@@ -544,7 +541,7 @@ if st.session_state.screen == "game":
     defaults = {
         "messages": [{"role": "assistant", "content": case.get("opening_line", "医生！快看看孩子！")}],
         "trust_score": 40 if mode == "easy" else 20,
-        "action_points": 6 if mode == "easy" else 4, # 第一幕初始体力
+        "action_points": 6 if mode == "easy" else 4, 
         "disease_progress": 30, "game_over": False, "time_period": 1, "unlocked_clues": [],
         "penalty_log": [], "crisis_correct_count": 0, "final_score": 0, "final_title": "",
         "score_inquiry": 0, "score_diagnosis": 0, "score_emergency": 0, "score_empathy": 0,
@@ -565,7 +562,6 @@ if st.session_state.screen == "game":
     check_achievements(case, st.session_state.current_case)
     dp = st.session_state.get("disease_progress", 0)
     
-    # 全屏警报特效
     if dp >= 90 and not st.session_state.get("game_over", False) and st.session_state.time_period != 3:
         alert_css = """<style>@keyframes full-red-pulse {0% {background-color: rgba(255,0,0,0.1);}50% {background-color: rgba(255,0,0,0.4);}100% {background-color: rgba(255,0,0,0.1);}} #critical-overlay {position: fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:999999;animation: full-red-pulse 0.8s infinite;}</style><div id="critical-overlay"></div>"""
         st.markdown(alert_css, unsafe_allow_html=True)
@@ -578,12 +574,11 @@ if st.session_state.screen == "game":
         st.markdown(f"### 🩺 病例：{case['name']}")
         render_sidebar_achievements(st.session_state.current_case)
 
-    # 顶部状态栏
     st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:{"#e63946" if st.session_state.trust_score <= 15 else "#00b4d8"};">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 体力(行动点)</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
 
- # ================= 左侧面板 =================
+    # ================= 左侧面板 =================
     with col_left:
         st.subheader("📈 生命体征")
         render_monitor(dp)
@@ -594,7 +589,6 @@ if st.session_state.screen == "game":
         
         st.divider()
         
-        # 核心流程控制
         if not st.session_state.game_over and st.session_state.time_period == 1:
             st.caption(f"💡 剩余体力：{st.session_state.action_points}")
             
@@ -642,7 +636,6 @@ if st.session_state.screen == "game":
                 if key not in ["theme", "screen", "current_case", "game_mode", "player_id", "player_name", "achievements", "completed_cases"]: del st.session_state[key]
             st.session_state.screen = "start"; st.rerun()
 
-
     # ================= 右侧线索夹 & 鉴别板 =================
     with col_right:
         st.subheader("📋 鉴别诊断板")
@@ -662,7 +655,7 @@ if st.session_state.screen == "game":
         elif len(st.session_state.my_hypotheses) > 2:
             st.warning("⚠️ 怀疑的疾病太多了，请结合查体线索聚焦！")
         else:
-            st.info("💡 **当前思路：** 你正在验证上述怀疑，请继续寻找证据。")
+            st.info("💡 **当前思路：** 你正在验证上述怀疑，请继续寻找证据（问诊/查体）。")
             
         if case.get("disease") in st.session_state.my_hypotheses:
             if st.session_state.current_case == "laryngitis" and "三凹征" in st.session_state.unlocked_clues:
@@ -689,7 +682,6 @@ if st.session_state.screen == "game":
 
     # ================= 中间核心交互区 =================
     with col_center:
-        # 幕数标题
         if not st.session_state.game_over:
             if st.session_state.time_period == 1: 
                 st.title("🎬 第一幕：急诊初探")
@@ -722,12 +714,10 @@ if st.session_state.screen == "game":
                     st.session_state.trust_score = 0; check_medical_dispute(); st.rerun()
             st.stop()
 
-        # 查体工具箱 (仅在自由接诊期可用)
         if not st.session_state.game_over and st.session_state.time_period == 1:
             with st.expander("🩺 体格检查与辅助检查工具箱（消耗体力）", expanded=False):
                 tab1, tab2, tab3, tab4 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊", "🧪 辅助检查"])
                 
-                # 视诊 - 改为填空
                 with tab1:
                     if st.button("开始视诊 (消耗1体力)", use_container_width=True):
                         if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("vis"):
@@ -735,14 +725,12 @@ if st.session_state.screen == "game":
                             st.session_state.visual_exam_mode = True; st.rerun()
                         elif st.session_state.action_points <= 0: st.error("体力不足！")
                 
-                # 听诊 - 虚拟合成音
                 with tab2:
                     if st.button("进行听诊 (消耗1体力)", use_container_width=True):
                         if st.session_state.action_points > 0 and not st.session_state.auscultation_completed:
                             st.session_state.action_points -= 1; st.session_state.auscultation_mode = True; st.rerun()
                         elif st.session_state.action_points <= 0: st.error("体力不足！")
                 
-                # 触诊
                 with tab3:
                     if st.button("进行触诊 (消耗1体力)", use_container_width=True):
                         if st.session_state.action_points > 0 and not st.session_state.physical_exam_done.get("palp"):
@@ -759,7 +747,6 @@ if st.session_state.screen == "game":
                             st.rerun()
                         elif st.session_state.action_points <= 0: st.error("体力不足！")
 
-                # 辅助检查 - 新增
                 with tab4:
                     if st.button("开具 X线/影像学检查 (消耗1体力)", use_container_width=True):
                         if st.session_state.action_points > 0 and "xray" not in st.session_state.lab_exams_done:
@@ -778,7 +765,6 @@ if st.session_state.screen == "game":
                             st.rerun()
                         elif st.session_state.action_points <= 0: st.error("体力不足！")
 
-        # 上级医生提问
         if st.session_state.get("senior_mode", False):
             st.info("📞 电话那头传来了上级医生疲惫但沉稳的声音：")
             q, options, correct_idx = "", [], 0
@@ -819,7 +805,6 @@ if st.session_state.screen == "game":
                     st.session_state.senior_mode = False; time.sleep(1.5); st.rerun()
             st.stop()
 
-        # ================= 视诊（填空题） =================
         if st.session_state.get("visual_exam_mode", False):
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
             
@@ -875,7 +860,6 @@ if st.session_state.screen == "game":
                     st.session_state.visual_exam_mode = False
                     st.rerun()
 
-        # ================= 听诊（虚拟合成音） =================
         elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
             audio_path = f"static/{case['audio']}"
@@ -919,7 +903,6 @@ if st.session_state.screen == "game":
                 time.sleep(1)
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
-        # ================= 聊天与初步诊断界面 =================
         else:
             with st.container(height=450):
                 for msg in st.session_state.messages: 
@@ -927,7 +910,6 @@ if st.session_state.screen == "game":
 
             if not st.session_state.game_over:
                 if st.session_state.time_period == 1:
-                    # 第一幕：自由接诊期
                     st.write("💡 **快捷问诊：**")
                     q_cols = st.columns(3)
                     if st.session_state.current_case == "laryngitis":
@@ -939,7 +921,7 @@ if st.session_state.screen == "game":
                     for i, q in enumerate(quick_prompts):
                         if q_cols[i].button(q, use_container_width=True): prompt = q
 
-                    chat_val = st.chat_input("输入问诊或安抚...")
+                    chat_val = st.chat_input("输入问诊、查体要求或安抚话语...")
                     if chat_val: prompt = chat_val
                     
                     if prompt:
@@ -950,13 +932,24 @@ if st.session_state.screen == "game":
                             
                             is_furious = st.session_state.trust_score <= 15
                             cold_words = ["闭嘴", "烦死了", "别吵", "赶紧的", "少废话", "按我说的做", "滚", "出去", "别哭了"]
-                            medical_keywords = ["疼", "痛", "咳", "喘", "烧", "吃", "喝", "拉", "吐", "睡", "精神", "怎么", "多久", "什么", "哪", "时", "检查", "听", "看", "摸", "病", "症", "大小便", "颜色", "呼吸", "胸口"]
-                            is_chitchat = not any(k in prompt for k in medical_keywords) and len(prompt) > 2
+                            empathy_words = ["别急", "不要急", "理解", "放心", "辛苦", "我知道", "我懂", "相信", "安抚", "冷静"]
+                            medical_keywords = ["疼", "痛", "咳", "喘", "烧", "吃", "喝", "拉", "吐", "睡", "精神", "怎么", "多久", "什么", "哪", "时", "检查", "听", "看", "摸", "病", "症", "大小便", "颜色", "呼吸", "胸口", "晚上", "半夜", "夜里", "加重", "白天", "过敏", "呛"]
+                            
+                            is_empathy = any(w in prompt for w in empathy_words)
+                            is_chitchat = not any(k in prompt for k in medical_keywords) and not is_empathy and len(prompt) > 2
                             
                             if any(w in prompt for w in cold_words):
                                 st.session_state.trust_score -= 30
                                 st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
                                 if check_medical_dispute(): st.rerun()
+                            
+                            # 🌟 新增：共情安抚成功分支
+                            elif is_empathy:
+                                st.session_state.trust_score = min(100, st.session_state.trust_score + 20)
+                                st.session_state.score_empathy += 10  # 加分，雷达图现在会动
+                                st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                st.session_state.messages.append({"role": "assistant", "content": "（家属愣了一下，情绪稍微平复了一些）：“医生，求您一定要救救孩子……”"})
+                                
                             elif is_chitchat:
                                 st.session_state.trust_score -= 5
                                 st.session_state.penalty_log.append("问诊时废话连篇")
@@ -966,7 +959,12 @@ if st.session_state.screen == "game":
                             else:
                                 try:
                                     if is_furious:
-                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒和绝望！你觉得医生非常不靠谱。直接质问、哭喊或威胁换医生，拒绝配合回答医学问题。不要超过40字。"""
+                                        # 🌟 修改：虽然发火，但强制要求回答
+                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒、焦虑和绝望！你觉得医生不靠谱。
+【核心规则】：
+1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”、“你到底会不会看！”），但【必须】顺带回答他的问题（如：“就是晚上重啊！你快给用药啊！”）。
+2. 绝对禁止完全拒绝回答，因为你是来看病的，不是来吵架的。
+3. 字数严格控制在40字以内。"""
                                     else:
                                         system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔，甚至有些自责。你是一个没有任何医学知识的普通家长。
 【核心规则】：
@@ -989,12 +987,16 @@ if st.session_state.screen == "game":
                                 for clue in case["clues"]:
                                     if clue not in st.session_state.unlocked_clues and check_clue_trigger(clue, match_text):
                                         st.session_state.unlocked_clues.append(clue); st.session_state.score_inquiry += 8; st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                        
+                                        # 🌟 新增：愤怒状态下的旁白补偿
+                                        if is_furious:
+                                            st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
+                                            
                                         explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
                                         st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
                             st.rerun()
 
                 elif st.session_state.time_period == 2:
-                    # 第二幕：初步诊断界面
                     st.info("🩺 请根据目前收集到的线索，输入您的初步诊断：")
                     diag_input = st.text_input("输入疾病名称（如：急性喉炎、气道异物等）：")
                     
@@ -1020,7 +1022,6 @@ if st.session_state.screen == "game":
                             st.rerun()
 
                 elif st.session_state.time_period == 3:
-                    # 第三幕：急救阶段
                     elapsed = time.time() - st.session_state.crisis_start_time
                     time_left = max(0, 90 - int(elapsed))
                     st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
