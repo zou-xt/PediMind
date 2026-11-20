@@ -583,7 +583,7 @@ if st.session_state.screen == "game":
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
 
-    # ================= 左侧面板 =================
+ # ================= 左侧面板 =================
     with col_left:
         st.subheader("📈 生命体征")
         render_monitor(dp)
@@ -598,12 +598,10 @@ if st.session_state.screen == "game":
         if not st.session_state.game_over and st.session_state.time_period == 1:
             st.caption(f"💡 剩余体力：{st.session_state.action_points}")
             
-            # 主动确诊
             if st.button("📝 结束接诊，给出诊断", use_container_width=True, type="primary"):
                 st.session_state.time_period = 2
                 st.rerun()
                 
-            # 病情恶化强制急救
             if st.session_state.disease_progress >= 80:
                 st.error("🚨 极度危险！")
                 if st.button("🚨 患儿突发恶化，强制抢救", use_container_width=True):
@@ -612,7 +610,6 @@ if st.session_state.screen == "game":
                     st.session_state.crisis_start_time = time.time()
                     st.session_state.messages.append({"role": "assistant", "content": "（患儿突然剧烈哭闹，呼吸极度困难！）医生救命啊！"})
                     st.rerun()
-            # 体力耗尽强制急救
             elif st.session_state.action_points <= 0:
                 st.warning("⚠️ 体力耗尽，时间拖得太久了！")
                 if st.button("🚨 紧急抢救", use_container_width=True):
@@ -623,7 +620,6 @@ if st.session_state.screen == "game":
                     st.session_state.messages.append({"role": "assistant", "content": "（时间被拖得太久，患儿脸色发紫！）医生，快救救他！"})
                     st.rerun()
 
-        # 急救成功进入复盘
         if st.session_state.time_period == 3 and st.session_state.crisis_correct_count >= 2:
             if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
                 st.session_state.score_emergency += 20
@@ -646,13 +642,13 @@ if st.session_state.screen == "game":
                 if key not in ["theme", "screen", "current_case", "game_mode", "player_id", "player_name", "achievements", "completed_cases"]: del st.session_state[key]
             st.session_state.screen = "start"; st.rerun()
 
+
     # ================= 右侧线索夹 & 鉴别板 =================
-   with col_right:
+    with col_right:
         st.subheader("📋 鉴别诊断板")
         st.caption("记录你的临床思路（可多选）：")
         hyp_options = list(case["diagnosis"].values())
         
-        # 加入了中文 placeholder
         st.session_state.my_hypotheses = st.multiselect(
             "怀疑的疾病", 
             hyp_options, 
@@ -661,15 +657,13 @@ if st.session_state.screen == "game":
             label_visibility="collapsed"
         )
         
-        # 动态临床反馈逻辑
         if len(st.session_state.my_hypotheses) == 0:
             st.caption("💡 *建议先勾选 1-2 个最怀疑的疾病。*")
         elif len(st.session_state.my_hypotheses) > 2:
             st.warning("⚠️ 怀疑的疾病太多了，请结合查体线索聚焦！")
         else:
-            st.info("💡 **当前思路：** 你正在验证上述怀疑，请继续寻找证据（问诊/查体）。")
+            st.info("💡 **当前思路：** 你正在验证上述怀疑，请继续寻找证据。")
             
-        # 结合具体病例给出极具针对性的提示
         if case.get("disease") in st.session_state.my_hypotheses:
             if st.session_state.current_case == "laryngitis" and "三凹征" in st.session_state.unlocked_clues:
                 st.success("✅ 线索吻合：你已经发现了三凹征，极大概率是这个病。")
