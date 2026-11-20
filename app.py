@@ -836,17 +836,96 @@ if st.session_state.screen == "game":
 
         elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
-            if os.path.exists(f"static/{case['audio']}"): st.audio(f"static/{case['audio']}", format="audio/mp3")
-            st.write("请判断：")
-            if st.button("吸气性喉鸣 (Stridor)"):
+            
+            # 检查本地是否有音频文件
+            audio_path = f"static/{case['audio']}"
+            
+            if os.path.exists(audio_path):
+                # 如果本地存在 mp3，则直接播放
+                st.audio(audio_path, format="audio/mp3")
+            else:
+                # 如果找不到 mp3，生成一个在线合成音效的播放器
+                st.info("📢 检测到本地音频文件缺失，已自动为你连接【虚拟听诊器】模拟音效。")
+                
+                audio_html = """
+                <div style="background:#1e1e1e; padding:15px; border-radius:10px; text-align:center; color:white; border: 2px solid #333;">
+                    <p style="color:#00ff00; font-family:monospace; font-size:16px; margin-bottom:15px;">🩺 虚拟听诊器已连接 (点击播放)</p>
+                    <button onclick="playStridor()" style="background:#4CAF50; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; margin-right:15px; font-weight:bold; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">▶ 播放 吸气性喉鸣 (Stridor)</button>
+                    <button onclick="playWheezing()" style="background:#FFC107; color:#333; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">▶ 播放 呼气性哮鸣音 (Wheezing)</button>
+                </div>
+                <script>
+                let audioCtx = null;
+                function initAudio() {
+                    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+                    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+                }
+                function playStridor() {
+                    initAudio();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                    const lfo = audioCtx.createOscillator();
+                    lfo.type = 'sine';
+                    lfo.frequency.value = 8; 
+                    const lfoGain = audioCtx.createGain();
+                    lfoGain.gain.value = 300;
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(osc.frequency);
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.1);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.5);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    lfo.start();
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 1.5);
+                }
+                function playWheezing() {
+                    initAudio();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    const lfo = audioCtx.createOscillator();
+                    lfo.type = 'sine';
+                    lfo.frequency.value = 4; 
+                    const lfoGain = audioCtx.createGain();
+                    lfoGain.gain.value = 80;
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(osc.frequency);
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.2);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2.0);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    lfo.start();
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 2.0);
+                }
+                </script>
+                """
+                components.html(audio_html, height=120)
+
+            st.write("### 请判断这是什么声音：")
+            if st.button("吸气性喉鸣 (Stridor)", use_container_width=True):
                 if case["disease"] in ("急性感染性喉炎", "急性会厌炎"):
                     st.session_state.unlocked_clues.append("吸气性喉鸣"); st.session_state.score_diagnosis += 10
-                else: st.session_state.trust_score -= 5
+                    st.success("✅ 判断正确！这是典型的上气道梗阻声音。")
+                else: 
+                    st.session_state.trust_score -= 5
+                    st.error("❌ 判断错误。")
+                time.sleep(1)
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
-            if st.button("呼气性哮鸣音 (Wheezing)"):
+                
+            if st.button("呼气性哮鸣音 (Wheezing)", use_container_width=True):
                 if case["disease"] == "支气管哮喘急性发作":
                     st.session_state.unlocked_clues.append("双肺哮鸣音"); st.session_state.score_diagnosis += 10
-                else: st.session_state.trust_score -= 5
+                    st.success("✅ 判断正确！这是典型的下气道痉挛声音。")
+                else: 
+                    st.session_state.trust_score -= 5
+                    st.error("❌ 判断错误。")
+                time.sleep(1)
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
         else:
