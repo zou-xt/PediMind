@@ -982,8 +982,9 @@ if st.session_state.screen == "game":
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
         st.plotly_chart(fig, use_container_width=True)
 
+        # 注意下面这两行的缩进，确保它们和上面的 st.info、st.plotly_chart 是左对齐的（通常是8个空格）
         st.subheader("🎓 生成专属虚拟医师执照")
-         if st.button("立即生成证书"):
+        if st.button("立即生成证书"):
             try:
                 # 1. 创建竖版画布 (类似真实证书比例)
                 W, H = 800, 1100
@@ -994,11 +995,11 @@ if st.session_state.screen == "game":
                 d.rectangle([15, 15, W-15, H-15], outline=(100, 150, 200), width=6)
                 d.rectangle([25, 25, W-25, H-25], outline=(150, 200, 230), width=2)
                 
-                # 3. 加载字体 (兼容 Linux 云端、Windows 本地、Mac)
+                # 3. 加载字体
                 font_paths = [
-                    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", # Streamlit Cloud (Linux)
-                    "C:/Windows/Fonts/msyh.ttc",                    # Windows (微软雅黑)
-                    "/System/Library/Fonts/PingFang.ttc"            # Mac
+                    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+                    "C:/Windows/Fonts/msyh.ttc",
+                    "/System/Library/Fonts/PingFang.ttc"
                 ]
                 font_title = font_text = font_bold = None
                 for fp in font_paths:
@@ -1009,7 +1010,6 @@ if st.session_state.screen == "game":
                         break
                 
                 if not font_title:
-                    st.error("未找到中文字体，生成可能乱码。请确保云端有 packages.txt 并包含 fonts-wqy-zenhei")
                     font_title = font_text = font_bold = ImageFont.load_default()
 
                 # 4. 绘制标题
@@ -1023,7 +1023,7 @@ if st.session_state.screen == "game":
                 
                 info_data = [
                     ("姓　　名：", st.session_state.player_name),
-                    ("性　　别：", "男/女"), # 可以随机或固定
+                    ("性　　别：", "男/女"),
                     ("执业级别：", "执业医师"),
                     ("执业类别：", "临床"),
                     ("执业范围：", "儿科专业"),
@@ -1042,7 +1042,6 @@ if st.session_state.screen == "game":
                 if os.path.exists("static/doctor.png"):
                     avatar = Image.open("static/doctor.png").convert("RGBA")
                     avatar = avatar.resize((150, 150))
-                    # 简单裁切为圆形（可选，这里为了不报错直接用方形粘贴）
                     img.paste(avatar, (W - 250, 200), avatar)
                 
                 # 7. 底部二维码和发证机关
