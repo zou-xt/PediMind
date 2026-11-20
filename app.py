@@ -93,24 +93,25 @@ CASES_CONFIG = {
 }
 
 # ================= 2.5 线索同义词及意图库 =================
+# 必须通过查体（视诊/听诊/触诊）才能获得的体征线索，聊天问诊绝对无法触发
+EXAM_CLUES = ["三凹征", "呼吸音不对称", "双肺哮鸣音"]
+
 CLUE_KEYWORDS = {
-    "犬吠样咳嗽": ["小狗叫", "狗叫", "空空", "犬吠", "像小狗"],
-    "夜间加重": ["晚上", "半夜", "夜里", "凌晨"],
-    "吸气性喉鸣": ["吸气", "喉咙响", "拉风箱", "吸不进去"],
-    "白天感冒史": ["感冒", "流鼻涕", "白天还好"],
-    "三凹征": ["胸口凹", "凹陷", "锁骨", "肋间", "脖子下面凹"],
-    "进食呛咳史": ["吃东西", "花生", "呛", "卡住"],
-    "剧烈呛咳": ["剧烈咳嗽", "咳得", "拼命咳"],
-    "呼吸音不对称": ["一边没声", "不对称", "右边"],
-    "面色发绀": ["脸紫", "嘴唇紫", "发紫", "憋紫"],
-    "既往哮喘史": ["以前也喘", "小时候喘", "哮喘", "喘过"],
-    "过敏史": ["过敏", "花粉", "起疹子"],
-    "呼气性呼吸困难": ["呼气", "吐气", "出气", "吹气"],
-    "双肺哮鸣音": ["嘶嘶", "拉风箱", "声音尖"],
-    "高热": ["发烧", "烫", "高烧"],
-    "流涎": ["流口水", "口水", "咽不下去"],
-    "吞咽困难": ["不想吃", "吞不下", "一吃就哭"],
-    "拒绝平卧": ["躺下", "一躺", "平躺", "坐下"],
+    "犬吠样咳嗽": ["小狗叫", "狗叫", "犬吠", "像小狗", "像狗叫", "空空的声音", "空空声", "空空的"],
+    "夜间加重": ["晚上加重", "半夜加重", "夜里加重", "凌晨", "夜间", "晚上更严重", "晚上厉害", "白天没事晚上重"],
+    "吸气性喉鸣": ["吸气", "喉咙响", "拉风箱", "吸不进去", "喉鸣", "吸气困难", "吸气有声音"],
+    "白天感冒史": ["感冒", "流鼻涕", "流鼻水", "白天没事", "白天还好"],
+    "进食呛咳史": ["吃东西呛", "吃花生", "卡住", "异物", "吃了东西后", "吃的时候突然"],
+    "剧烈呛咳": ["剧烈咳嗽", "咳得", "拼命咳", "咳个不停", "连续咳"],
+    "面色发绀": ["脸紫", "嘴唇紫", "发紫", "憋紫", "面色青", "脸发青", "嘴唇发黑"],
+    "既往哮喘史": ["以前也喘", "小时候喘", "哮喘", "喘过", "老毛病", "有喘息史"],
+    "过敏史": ["过敏", "花粉", "起疹子", "接触过敏"],
+    "呼气性呼吸困难": ["呼气", "吐气", "出气", "吹气", "呼气困难", "呼气延长"],
+    "高热": ["发烧", "烫", "高烧", "发热", "体温高"],
+    "流涎": ["流口水", "口水", "咽不下去", "流涎", "一直流口水"],
+    "吞咽困难": ["不想吃", "吞不下", "一吃就哭", "不敢咽"],
+    "拒绝平卧": ["躺下", "一躺", "平躺", "坐下", "不敢躺", "坐起来"],
+    "无犬吠样咳嗽": ["不咳", "没有咳", "不是小狗叫", "不空空"],
 }
 
 CLUE_EXPLANATIONS = {
@@ -129,13 +130,12 @@ CLUE_EXPLANATIONS = {
 
 def check_clue_trigger(clue: str, prompt: str) -> bool:
     p = prompt.lower()
+    # 1. 查体类线索，聊天绝对无法解锁
+    if clue in EXAM_CLUES: 
+        return False
+    # 2. 严格匹配
     if clue in CLUE_KEYWORDS:
         if any(kw in p for kw in CLUE_KEYWORDS[clue]): return True
-    if clue == "犬吠样咳嗽" and ("咳" in p or "小狗" in p or "空空" in p): return True
-    elif clue == "夜间加重" and any(k in p for k in ["晚上", "夜里", "半夜"]): return True
-    elif clue == "三凹征" and any(k in p for k in ["喘", "呼吸", "凹", "陷"]): return True
-    elif clue == "进食呛咳史" and any(k in p for k in ["吃", "呛", "花生", "异物"]): return True
-    elif clue == "既往哮喘史" and any(k in p for k in ["以前", "既往", "喘过"]): return True
     return False
 
 def check_medical_dispute():
@@ -335,46 +335,128 @@ def render_monitor(disease_progress: int):
     elif disease_progress < 70: hr, spo2, rr, bp_sys, bp_dia, status = 140, 93, 35, 90, 50, "warn"
     elif disease_progress < 90: hr, spo2, rr, bp_sys, bp_dia, status = 160, 88, 45, 80, 40, "danger"
     else: hr, spo2, rr, bp_sys, bp_dia, status = 180, 82, 55, 60, 30, "critical"
+
     html_code = f"""<html><head><style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{ background:#000; overflow:hidden; font-family:'Courier New',monospace; display:flex; justify-content:center; }}
-      .monitor {{ position:relative; width:100%; max-width: 450px; height:230px; background:#000; border-radius:6px; border:2px solid #333; overflow:hidden; display:flex; box-shadow: inset 0 0 20px rgba(0,0,0,0.9); }}
-      .wave-area {{ flex: 1; position: relative; }} canvas {{ display:block; width:100%; height:100%; }}
-      .vitals {{ width: 110px; background: #000; padding: 10px 8px; display: flex; flex-direction: column; justify-content: space-evenly; border-left: 1px solid #333; }}
-      .vital-item {{ line-height: 1; margin-bottom: 4px; }}
-      .vital-label {{ font-size: 10px; color: #888; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
-      .vital-value {{ font-size: 28px; font-weight: bold; }}
-      .vital-unit  {{ font-size: 10px; color: #888; margin-left: 2px; }}
-      .c-green {{ color:#39ff14; text-shadow: 0 0 8px rgba(57,255,20,0.6); }} 
-      .c-cyan {{ color:#00ffff; text-shadow: 0 0 8px rgba(0,255,255,0.6); }}
-      .c-yellow {{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.6); }}
-      .c-purple {{ color:#ff00ff; text-shadow: 0 0 8px rgba(255,0,255,0.6); }}
-      .blink {{ animation:blink 0.8s infinite; }} @keyframes blink {{ 50% {{ opacity:0.3; }} }}
-    </style></head><body><div class="monitor"><div class="wave-area"><canvas id="ecg"></canvas></div><div class="vitals">
-          <div class="vital-item"><div class="vital-label">HR</div><span id="hr" class="vital-value c-green">--</span><span class="vital-unit">bpm</span></div>
-          <div class="vital-item"><div class="vital-label">BP</div><span id="bp" class="vital-value c-purple">--/--</span><span class="vital-unit">mmHg</span></div>
-          <div class="vital-item"><div class="vital-label">SpO₂</div><span id="spo2" class="vital-value c-cyan">--</span><span class="vital-unit">%</span></div>
-          <div class="vital-item"><div class="vital-label">RR</div><span id="rr" class="vital-value c-yellow">--</span><span class="vital-unit">/min</span></div>
-    </div></div><script>
+      .monitor {{ position:relative; width:100%; max-width: 480px; height:280px; background:#000; border-radius:6px; border:2px solid #222; overflow:hidden; display:flex; box-shadow: inset 0 0 20px rgba(0,0,0,0.9); }}
+      .wave-area {{ flex: 1; position: relative; background:#050505; }} 
+      canvas {{ display:block; width:100%; height:100%; }}
+      .vitals {{ width: 130px; background: #000; padding: 10px 10px; display: flex; flex-direction: column; justify-content: space-around; border-left: 1px solid #222; }}
+      .vital-item {{ display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }}
+      .vital-label {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
+      .vital-value {{ font-size: 38px; font-weight: bold; font-family: 'Arial', sans-serif; }}
+      .vital-unit  {{ font-size: 10px; color: #666; margin-top: 2px; }}
+      .c-green {{ color:#00ff00; text-shadow: 0 0 8px rgba(0,255,0,0.4); }} 
+      .c-red   {{ color:#ff3333; text-shadow: 0 0 8px rgba(255,51,51,0.4); }}
+      .c-yellow{{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.4); }}
+      .c-white {{ color:#ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.4); }}
+      .blink {{ animation:blink 0.8s infinite; }} 
+      @keyframes blink {{ 50% {{ opacity:0.3; }} }}
+    </style></head><body>
+    <div class="monitor">
+      <div class="wave-area"><canvas id="monitorCanvas"></canvas></div>
+      <div class="vitals">
+        <div class="vital-item">
+          <div class="vital-label c-green">HR</div>
+          <span id="hr" class="vital-value c-green">--</span>
+          <span class="vital-unit">bpm</span>
+        </div>
+        <div class="vital-item">
+          <div class="vital-label c-red">ABP</div>
+          <span id="bp" class="vital-value c-red">--/--</span>
+          <span class="vital-unit">mmHg</span>
+        </div>
+        <div class="vital-item">
+          <div class="vital-label c-yellow">SpO₂</div>
+          <span id="spo2" class="vital-value c-yellow">--</span>
+          <span class="vital-unit">%</span>
+        </div>
+        <div class="vital-item">
+          <div class="vital-label c-white">RESP</div>
+          <span id="rr" class="vital-value c-white">--</span>
+          <span class="vital-unit">/min</span>
+        </div>
+      </div>
+    </div>
+    <script>
       const HR={hr}, SPO2={spo2}, RR={rr}, BP_SYS={bp_sys}, BP_DIA={bp_dia}, STATUS="{status}";
-      const canvas = document.getElementById('ecg'); const ctx = canvas.getContext('2d'); let W, H;
-      function resize() {{ const r = canvas.parentElement.getBoundingClientRect(); canvas.width = r.width * devicePixelRatio; canvas.height = r.height * devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); W = r.width; H = r.height; }}
+      const canvas = document.getElementById('monitorCanvas'); 
+      const ctx = canvas.getContext('2d'); 
+      let W, H;
+      function resize() {{ 
+          const r = canvas.parentElement.getBoundingClientRect(); 
+          canvas.width = r.width * devicePixelRatio; 
+          canvas.height = r.height * devicePixelRatio; 
+          ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); 
+          W = r.width; H = r.height; 
+      }}
       window.addEventListener('resize', resize); resize();
-      function ecgSample(p) {{ let v = 0; if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI); if (p > 0.22 && p < 0.24) v -= 0.15; if (p > 0.24 && p < 0.26) v += 1.0; if (p > 0.26 && p < 0.28) v -= 0.25; if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); return v; }}
-      function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.3) / 0.08, 2)) + Math.exp(-Math.pow((p - 0.5) / 0.1, 2)) * 0.4; }}
+      function ecgSample(p) {{ 
+          let v = 0; 
+          if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI);
+          if (p > 0.22 && p < 0.24) v -= 0.15; 
+          if (p > 0.24 && p < 0.26) v += 1.0;  
+          if (p > 0.26 && p < 0.28) v -= 0.25; 
+          if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); 
+          return v; 
+      }}
+      function abpSample(p) {{
+          if (p < 0.15) return Math.sin((p / 0.15) * Math.PI / 2); 
+          if (p >= 0.15 && p < 0.3) return 0.8 + 0.2 * Math.sin(((p - 0.15) / 0.15) * Math.PI / 2); 
+          if (p >= 0.3 && p < 0.4) return 1.0 - 0.3 * Math.sin(((p - 0.3) / 0.1) * Math.PI); 
+          return Math.max(0, 0.7 - ((p - 0.4) / 0.6) * 0.7); 
+      }}
+      function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.25) / 0.1, 2)) + Math.exp(-Math.pow((p - 0.55) / 0.12, 2)) * 0.3; }}
       function respSample(p) {{ return Math.sin(p * Math.PI * 2); }}
-      const BUFFER = 600; const ecgData = new Array(BUFFER).fill(0), plethData = new Array(BUFFER).fill(0), respData = new Array(BUFFER).fill(0);
-      let ecgPhase = 0, plethPhase = 0, respPhase = 0; const cycleDur = 60 / HR, sampleInterval = 0.008, perFrame = 2;
-      const dEcgPhase = (sampleInterval / cycleDur) * perFrame, dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
-      function drawGrid(h) {{ ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(255,255,255,0.05)"; for (let x=0; x<W; x+=10) {{ ctx.beginPath(); ctx.moveTo(x,h-h*0.33); ctx.lineTo(x,h); ctx.stroke(); }} for (let y=h-h*0.33; y<h; y+=10) {{ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }} }}
-      function drawWave(data, h_offset, h_region, color, amp) {{ const step = W / BUFFER; const midY = h_offset + h_region * 0.5; ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.shadowBlur = 4; ctx.shadowColor = color; for (let i=0; i<BUFFER; i++) {{ const x = i*step, y = midY - data[i]*amp; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }} ctx.stroke(); ctx.shadowBlur = 0; }}
-      function loop() {{ for (let k=0; k<perFrame; k++) {{ ecgPhase = (ecgPhase + dEcgPhase) % 1; let v_ecg = ecgSample(ecgPhase); if (STATUS==="danger"||STATUS==="critical") v_ecg += (Math.random()-0.5)*0.05; ecgData.push(v_ecg); ecgData.shift(); if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; else plethPhase += dEcgPhase; if(plethPhase > 1) plethPhase = 1; plethData.push(plethSample(plethPhase)); plethData.shift(); respPhase = (respPhase + dRespPhase) % 1; respData.push(respSample(respPhase)); respData.shift(); }} ctx.clearRect(0,0,W,H); drawGrid(H*0.33); drawWave(ecgData, 0, H*0.33, "#39ff14", H*0.15); drawWave(plethData, H*0.33, H*0.33, "#00ffff", H*0.15); drawWave(respData, H*0.66, H*0.34, "#ffff00", H*0.12); requestAnimationFrame(loop); }}
+      const BUFFER = 500; 
+      const ecgData = new Array(BUFFER).fill(0);
+      const abpData = new Array(BUFFER).fill(0);
+      const plethData = new Array(BUFFER).fill(0);
+      const respData = new Array(BUFFER).fill(0);
+      let ecgPhase = 0, abpPhase = 0, plethPhase = 0, respPhase = 0; 
+      const cycleDur = 60 / HR, sampleInterval = 0.008, perFrame = 2;
+      const dEcgPhase = (sampleInterval / cycleDur) * perFrame;
+      const dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
+      function drawGrid(h4) {{ 
+          ctx.lineWidth = 0.5; 
+          ctx.strokeStyle = "rgba(255,255,255,0.03)"; 
+          for (let x=0; x<W; x+=15) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }} 
+          for (let i=0; i<4; i++) {{ let y = i * h4; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
+      }}
+      function drawWave(data, h_offset, h_region, color, amp) {{ 
+          const step = W / BUFFER; const midY = h_offset + h_region * 0.6; 
+          ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.0; ctx.lineJoin = 'round'; ctx.shadowBlur = 4; ctx.shadowColor = color; 
+          for (let i=0; i<BUFFER; i++) {{ const x = i*step, y = midY - data[i]*amp; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }} 
+          ctx.stroke(); ctx.shadowBlur = 0; 
+      }}
+      function loop() {{ 
+          for (let k=0; k<perFrame; k++) {{ 
+              ecgPhase = (ecgPhase + dEcgPhase) % 1; abpPhase = (abpPhase + dEcgPhase) % 1;
+              if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; else plethPhase += dEcgPhase; if(plethPhase > 1) plethPhase = 1;
+              respPhase = (respPhase + dRespPhase) % 1; 
+              let v_ecg = ecgSample(ecgPhase); let v_abp = abpSample(abpPhase);
+              if (STATUS==="danger"||STATUS==="critical") {{ v_ecg += (Math.random()-0.5)*0.08; v_abp += (Math.random()-0.5)*0.05; }}
+              ecgData.push(v_ecg); ecgData.shift(); abpData.push(v_abp); abpData.shift();
+              plethData.push(plethSample(plethPhase)); plethData.shift(); respData.push(respSample(respPhase)); respData.shift(); 
+          }} 
+          ctx.clearRect(0,0,W,H); const h4 = H / 4; drawGrid(h4); 
+          drawWave(ecgData, 0, h4, "#00ff00", h4*0.4);   
+          drawWave(abpData, h4, h4, "#ff3333", h4*0.4);  
+          drawWave(plethData, h4*2, h4, "#ffff00", h4*0.4); 
+          drawWave(respData, h4*3, h4, "#ffffff", h4*0.35); 
+          requestAnimationFrame(loop); 
+      }}
       requestAnimationFrame(loop);
       function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
-      function updateVitals() {{ document.getElementById('hr').textContent = jit(HR, 2); document.getElementById('spo2').textContent = jit(SPO2, 1); document.getElementById('rr').textContent = jit(RR, 1); document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); if (STATUS==="critical"||STATUS==="danger") document.getElementById('hr').className = "vital-value c-green blink"; }}
+      function updateVitals() {{ 
+          document.getElementById('hr').textContent = jit(HR, 2); document.getElementById('spo2').textContent = jit(SPO2, 1); 
+          document.getElementById('rr').textContent = jit(RR, 1); document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); 
+          if (STATUS==="critical"||STATUS==="danger") { document.getElementById('hr').classList.add('blink'); } else { document.getElementById('hr').classList.remove('blink'); }
+      }}
       updateVitals(); setInterval(updateVitals, 1000);
     </script></body></html>"""
-    components.html(html_code, height=240, scrolling=False)
+    components.html(html_code, height=290, scrolling=False)
 
 def _try_unlock(key: str):
     if key not in st.session_state.achievements: st.session_state.achievements.append(key)
@@ -507,7 +589,7 @@ if st.session_state.screen == "profile":
         for r in records:
             mistakes = json.loads(r["mistakes"] or "[]")
             with st.expander(f"{'✅' if r['survived'] else '💀'} {r['created_at']} | {r['disease']} | 得分 {r['final_score']}"):
-                st.write(f"**难度**：{r['mode']} | **病情度**：{r['disease_progress']}")
+                st.write(f"**难度**：{r['mode']} | **病情度**：{max(0, r['disease_progress'])}")
                 if mistakes: st.warning("**失误记录：**\n" + "\n".join(f"- {m}" for m in mistakes))
     st.stop()
 
@@ -574,7 +656,7 @@ if st.session_state.screen == "game":
         st.markdown(f"### 🩺 病例：{case['name']}")
         render_sidebar_achievements(st.session_state.current_case)
 
-    st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:{"#e63946" if st.session_state.trust_score <= 15 else "#00b4d8"};">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 体力(行动点)</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{st.session_state.disease_progress}</div></div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="display: flex; justify-content: space-around; gap: 15px; margin-bottom: 25px;"><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">❤️ 信任值</div><div style="font-size:20px; font-weight:800; color:{"#e63946" if st.session_state.trust_score <= 15 else "#00b4d8"};">{st.session_state.trust_score}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⏳ 体力(行动点)</div><div style="font-size:20px; font-weight:800; color:#f6e05e;">{st.session_state.action_points}</div></div><div class="status-badge"><div style="font-size:12px; color:#a0aec0;">⚠️ 病情度</div><div style="font-size:20px; font-weight:800; color:#e63946;">{max(0, st.session_state.disease_progress)}</div></div></div>', unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1.2, 2.3, 1.2])
 
@@ -845,10 +927,16 @@ if st.session_state.screen == "game":
                         st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                         st.session_state.score_inquiry += 10
                         st.session_state.messages.append({"role": "assistant", "content": f"（视诊记录：{exam_finding}。你敏锐地察觉到了病情的关键！）"})
-                        if st.session_state.current_case == "laryngitis" and "三凹征" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("三凹征")
+                        
+                        # 确保视诊成功后，一定会解锁对应的查体线索！
+                        if st.session_state.current_case == "laryngitis" and "三凹征" not in st.session_state.unlocked_clues: 
+                            st.session_state.unlocked_clues.append("三凹征")
                         elif st.session_state.current_case == "epiglottitis":
                             if "流涎" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("流涎")
                             if "拒绝平卧" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("拒绝平卧")
+                        elif st.session_state.current_case in ["foreign_body", "asthma"]:
+                            if "面色发绀" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("面色发绀")
+                            
                         st.success("✅ 视诊准确！你抓住了核心体征。")
                     else:
                         st.session_state.trust_score -= 5
@@ -943,7 +1031,7 @@ if st.session_state.screen == "game":
                                 st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
                                 if check_medical_dispute(): st.rerun()
                             
-                            # 🌟 新增：共情安抚成功分支
+                            # 共情安抚成功分支
                             elif is_empathy:
                                 st.session_state.trust_score = min(100, st.session_state.trust_score + 20)
                                 st.session_state.score_empathy += 10  # 加分，雷达图现在会动
@@ -959,7 +1047,6 @@ if st.session_state.screen == "game":
                             else:
                                 try:
                                     if is_furious:
-                                        # 🌟 修改：虽然发火，但强制要求回答
                                         system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒、焦虑和绝望！你觉得医生不靠谱。
 【核心规则】：
 1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”、“你到底会不会看！”），但【必须】顺带回答他的问题（如：“就是晚上重啊！你快给用药啊！”）。
@@ -969,12 +1056,11 @@ if st.session_state.screen == "game":
                                         system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔，甚至有些自责。你是一个没有任何医学知识的普通家长。
 【核心规则】：
 1. 【问什么答什么】医生问什么，你答什么，绝对不要主动长篇大论罗列症状。
-2. 【语气生动】用极其口语化、大白话回答。可以感叹“哎呀医生”、“急死我了”，但【绝对禁止】每次用相同口头禅（如不要总说“我也不懂啊”）。用词多样化。
-3. 【细节化描述】如医生问吃了什么，要说：“就正常吃了点家常菜和水果啊医生，难道是吃坏东西了吗？”
-4. 【绝对不剧透】必须等医生具体问到那个症状你再答。绝对禁止使用专业术语和给出诊断！
-5. 【拒绝闲聊】如果医生问废话，不要顺着聊，直接催促看病。
-6. 【信息不对称/隐瞒】如果是异物病例，除非医生明确问“有没有吃花生/坚果/含东西”，否则你一开始只说“吃了点饭就突然咳了”。
-7. 【字数限制】严格控制在50字以内。"""
+2. 【严禁使用专业术语】绝对不能说出“三凹征”、“发绀”、“哮鸣音”、“喉鸣”等专业医学词汇！你只是个普通老百姓，只会用大白话。
+3. 【严禁主动报病名或特殊体征】如果医生只是泛泛地问“怎么了”、“哪不舒服”，你只能说：“孩子突然喘不上气”、“孩子一直哭闹说难受”。只有医生问到了具体的，你才具体回答（例如医生问“咳嗽声音像什么”，你答“像小狗叫”）。
+4. 【语气生动】用极其口语化、大白话回答。可以感叹“哎呀医生”、“急死我了”。
+5. 【信息不对称/隐瞒】如果是异物病例，除非医生明确问“有没有吃花生/坚果”，否则你一开始只说“吃了点饭就突然咳了”。
+6. 【字数限制】严格控制在50字以内。"""
                                     
                                     api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
                                     response = client.chat.completions.create(model=MODEL_NAME, messages=api_messages, temperature=0.65, max_tokens=120)
@@ -988,7 +1074,6 @@ if st.session_state.screen == "game":
                                     if clue not in st.session_state.unlocked_clues and check_clue_trigger(clue, match_text):
                                         st.session_state.unlocked_clues.append(clue); st.session_state.score_inquiry += 8; st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                         
-                                        # 🌟 新增：愤怒状态下的旁白补偿
                                         if is_furious:
                                             st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
                                             
@@ -1022,10 +1107,28 @@ if st.session_state.screen == "game":
                             st.rerun()
 
                 elif st.session_state.time_period == 3:
+                    # 急救成功拦截，防止连点导致病情度溢出为负数，并直接锁定胜局
+                    if st.session_state.crisis_correct_count >= 2:
+                        st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
+                        if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
+                            st.session_state.score_emergency += 20
+                            st.session_state.time_period = 4
+                            st.session_state.game_over = True
+                            st.session_state.disease_progress = min(40, max(10, st.session_state.disease_progress))
+                            st.rerun()
+                        st.stop()
+                        
+                    if st.session_state.game_over:
+                        st.stop()
+
                     elapsed = time.time() - st.session_state.crisis_start_time
                     time_left = max(0, 90 - int(elapsed))
                     st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
-                    if time_left <= 0: st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
+                    
+                    if time_left <= 0: 
+                        st.session_state.disease_progress = 100
+                        st.session_state.game_over = True
+                        st.rerun()
                     
                     if st.session_state.action_points > 0:
                         for opt_key, opt_val in case["crisis"].items():
@@ -1033,18 +1136,32 @@ if st.session_state.screen == "game":
                                 st.session_state.action_points -= 1
                                 st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
                                 st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
-                                st.session_state.disease_progress += opt_val["disease"]
-                                if opt_val["type"] == "correct": st.session_state.crisis_correct_count += 1
+                                
+                                # 限制病情度范围
+                                new_progress = st.session_state.disease_progress + opt_val["disease"]
+                                st.session_state.disease_progress = max(0, min(100, new_progress))
+                                
+                                if opt_val["type"] == "correct": 
+                                    st.session_state.crisis_correct_count += 1
                                 else:
                                     st.session_state.penalty_log.append(opt_val["label"])
                                     st.session_state.trust_score -= 25
-                                    if st.session_state.disease_progress >= 100: st.session_state.game_over = True
-                                    if check_medical_dispute(): st.rerun()
+                                    if st.session_state.disease_progress >= 100: 
+                                        st.session_state.game_over = True
+                                    if check_medical_dispute(): 
+                                        st.rerun()
                                 st.rerun()
                     else:
                         st.warning("⚠️ 你的体力已耗尽，无法进行更多操作！等待命运裁决...")
                         if st.button("等待结果"):
-                            st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
+                            if st.session_state.crisis_correct_count >= 2:
+                                st.session_state.time_period = 4
+                                st.session_state.game_over = True
+                                st.session_state.disease_progress = max(10, st.session_state.disease_progress)
+                            else:
+                                st.session_state.disease_progress = 100
+                                st.session_state.game_over = True
+                            st.rerun()
 
     # ================= 第四幕：结案复盘 =================
     if st.session_state.game_over:
@@ -1062,16 +1179,30 @@ if st.session_state.screen == "game":
             st.session_state.record_saved = True
 
         if not st.session_state.ai_review_generated:
-            with st.spinner("👨‍⚕️ AI 主治医师正在翻阅你的病历..."):
+            with st.spinner("👨‍⚕️ 主治医师正在整理疾病知识点并进行查房复盘..."):
                 try:
+                    missed_clues = set(case['clues']) - set(st.session_state.unlocked_clues)
+                    all_clues = "、".join(case['clues'])
+                    
                     review_prompt = f"""
-                    你是一名严厉但负责的儿科主任。请复盘以下住院医的急诊表现：
-                    病例：{case['disease']}
-                    失误记录：{str(st.session_state.penalty_log)}
-                    未发现的线索：{set(case['clues']) - set(st.session_state.unlocked_clues)}
-                    请用 150 字以内的大白话说出：他做对了什么？漏掉了什么关键体征？以后遇到类似患儿应该怎么处理？
+                    你是一名严厉但负责的三甲医院儿科主任医师。正在进行临床带教查房复盘。你正在当面点评刚刚接诊完【{case['disease']}】的住院医（玩家）。
+                    
+                    【本病例标准核心线索】：{all_clues}
+                    【玩家漏掉的线索】：{missed_clues}
+                    【玩家的操作失误】：{st.session_state.penalty_log}
+                    
+                    【核心要求】：必须全程使用第二人称“你”！绝对禁止使用“他”、“该医生”等第三人称。
+                    
+                    请用 250 字左右的医学专业口吻进行点评，必须严格按以下三个部分输出：
+                    
+                    1. 【疾病知识微课】：先花两句话简明扼要地讲解【{case['disease']}】的典型临床表现是什么，以及接诊时【最核心的问诊/查体要点】应该包含哪些。
+                    2. 【你的实战评价】：结合本病例的标准线索，一针见血地指出玩家刚才的表现（比如：你问出了什么、漏掉了什么、思维哪里不到位）。
+                    3. 【临床干预红线】：强调该病在急救或处置上绝对禁止的操作（避坑），以及首选的抢救原则。
+                    
+                    （如果玩家完美通关，也要简要复习知识点并予以肯定）。
                     """
-                    res = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": review_prompt}], temperature=0.5)
+                    
+                    res = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": review_prompt}], temperature=0.6)
                     st.session_state.ai_review = res.choices[0].message.content
                     st.session_state.ai_review_generated = True
                 except:
