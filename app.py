@@ -452,8 +452,7 @@ def render_monitor(disease_progress: int):
       function updateVitals() {{ 
           document.getElementById('hr').textContent = jit(HR, 2); document.getElementById('spo2').textContent = jit(SPO2, 1); 
           document.getElementById('rr').textContent = jit(RR, 1); document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); 
-          if (STATUS==="critical"||STATUS==="danger") { document.getElementById('hr').classList.add('blink'); } else { document.getElementById('hr').classList.remove('blink'); }
-      }}
+          if (STATUS==="critical"||STATUS==="danger") {{ document.getElementById('hr').classList.add('blink'); }} else {{ document.getElementById('hr').classList.remove('blink'); }}
       updateVitals(); setInterval(updateVitals, 1000);
     </script></body></html>"""
     components.html(html_code, height=290, scrolling=False)
