@@ -407,13 +407,12 @@ def render_monitor(disease_progress: int):
       // ECG：根据状态改变形态
       function ecgSample(p) {{ 
           let v = 0; 
-          // P波
-          v += 0.1 * Math.exp(-Math.pow((p - 0.15) / 0.02, 2)); 
+          // P波 (心房除极)
+          v += 0.12 * Math.exp(-Math.pow((p - 0.1) / 0.02, 2)); 
           
           // 模拟异常早搏 (仅在 critical 时出现)
           let isPVC = false;
           if (STATUS === "critical") {{
-              // 每 4-5 个心动周期出现一次宽大畸形的早搏
               if (beatCount % 5 === 0 && p < 0.4) {{ isPVC = true; }}
           }}
 
@@ -423,43 +422,53 @@ def render_monitor(disease_progress: int):
               v += 1.5 * Math.exp(-Math.pow((p - 0.3) / 0.05, 2));
               v -= 0.4 * Math.exp(-Math.pow((p - 0.4) / 0.06, 2));
           }} else {{
-              // 正常的 QRS 波
-              v -= 0.15 * Math.exp(-Math.pow((p - 0.26) / 0.006, 2)); 
-              v += 1.2 * Math.exp(-Math.pow((p - 0.28) / 0.008, 2)); 
-              v -= 0.3 * Math.exp(-Math.pow((p - 0.30) / 0.01, 2)); 
+              // QRS 波群
+              v -= 0.15 * Math.exp(-Math.pow((p - 0.24) / 0.008, 2)); // Q波
+              v += 1.0 * Math.exp(-Math.pow((p - 0.26) / 0.01, 2));   // R波
+              v -= 0.3 * Math.exp(-Math.pow((p - 0.28) / 0.012, 2));  // S波
               
-              // T波：在 danger 时变平，critical 时倒置
+              // T波 (心室复极)
               let tAmp = 0.25;
               if (STATUS === "danger") tAmp = 0.1;
               if (STATUS === "critical") tAmp = -0.15;
-              v += tAmp * Math.exp(-Math.pow((p - 0.45) / 0.05, 2)); 
+              v += tAmp * Math.exp(-Math.pow((p - 0.45) / 0.06, 2)); 
           }}
           return v; 
       }}
       
-      // ABP：灌注差时波形变低平
+      // ABP：快速上升，缓慢下降，带重搏切迹
       function abpSample(p) {{
           let amp = 1.0;
-          let notch = 0.15;
-          if (STATUS === "danger") {{ amp = 0.6; notch = 0.05; }} // 脉压差减小
-          if (STATUS === "critical") {{ amp = 0.2; notch = 0; }} // 休克低灌注，波形平坦
+          let notch = 0.15; // 重搏切迹
+          if (STATUS === "danger") {{ amp = 0.6; notch = 0.05; }} 
+          if (STATUS === "critical") {{ amp = 0.2; notch = 0; }} 
 
           let v;
-          if (p < 0.15) v = Math.sin((p / 0.15) * Math.PI / 2);
-          else if (p < 0.4) v = 1.0 - (p - 0.15) * 1.2 + notch * Math.exp(-Math.pow((p - 0.35) / 0.03, 2)); 
-          else v = 0.7 - (p - 0.4) * 0.8;
+          if (p < 0.12) {{
+              // 快速上升期 (收缩期)
+              v = Math.sin((p / 0.12) * Math.PI / 2);
+          }} else if (p < 0.45) {{
+              // 缓慢下降期 + 重搏切迹
+              v = 1.0 - (p - 0.12) * 1.4 + notch * Math.exp(-Math.pow((p - 0.3) / 0.04, 2)); 
+          }} else {{
+              // 舒张期末期
+              v = Math.max(0, 0.55 - (p - 0.45) * 0.8);
+          }}
           return v * amp;
       }}
       
-      // SpO2：缺氧时波幅变小，信号变差
+      // SpO2 (Pleth)：平滑圆润的脉搏波，带小重搏波
       function plethSample(p) {{ 
           let amp = 1.0;
           let noise = 0;
           if (STATUS === "danger") {{ amp = 0.5; }}
-          if (STATUS === "critical") {{ amp = 0.15; noise = (Math.random()-0.5)*0.1; }} // 极度微弱且带毛刺
+          if (STATUS === "critical") {{ amp = 0.15; noise = (Math.random()-0.5)*0.1; }}
           
-          let v = (Math.exp(-Math.pow((p - 0.2) / 0.06, 2)) + 0.4 * Math.exp(-Math.pow((p - 0.45) / 0.08, 2))) * amp;
-          return v + noise; 
+          // 高斯函数组合，使波峰平滑、圆润
+          let peak1 = Math.exp(-Math.pow((p - 0.15) / 0.1, 2)); // 主峰
+          let peak2 = 0.35 * Math.exp(-Math.pow((p - 0.4) / 0.12, 2)); // 重搏波
+          
+          return (peak1 + peak2) * amp + noise; 
       }}
       
       // RESP：濒危时呼吸极度不规则
