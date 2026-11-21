@@ -1013,7 +1013,7 @@ if st.session_state.screen == "game":
                                     st.session_state.messages.append({"role": "assistant", "content": "（就在你思考的瞬间，患儿突发严重的呼吸困难！）"})
                                     st.rerun()
 
-                        elif st.session_state.time_period == 3:
+                                                elif st.session_state.time_period == 3:
                             if st.session_state.crisis_correct_count >= 2:
                                 st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
                                 if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
@@ -1026,9 +1026,53 @@ if st.session_state.screen == "game":
                                 
                             elapsed = time.time() - st.session_state.crisis_start_time
                             time_left = max(0, 90 - int(elapsed))
-                            st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
-                            if time_left <= 0: st.session_state.disease_progress = 100; st.session_state.game_over = True; st.rerun()
                             
+                            # ================= 新增：真实的倒计时和超时自动提交 =================
+                            if time_left > 0:
+                                # 前端显示的倒计时
+                                st.markdown(f'''
+                                    <div style="background-color: #fee2e2; color: #ef4444; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 15px;">
+                                        ⏰ 紧急抢救倒计时：<span id="timer">{time_left}</span> 秒！请立即选择：
+                                    </div>
+                                    <script>
+                                        var timeleft = {time_left};
+                                        var downloadTimer = setInterval(function(){{
+                                            timeleft -= 1;
+                                            if(timeleft <= 0){{
+                                                clearInterval(downloadTimer);
+                                                document.getElementById("timer").innerHTML = "0";
+                                                // 超时后，强制点击隐藏按钮触发页面刷新
+                                                document.getElementById("timeout_trigger").click();
+                                            }} else {{
+                                                document.getElementById("timer").innerHTML = timeleft;
+                                            }}
+                                        }}, 1000);
+                                    </script>
+                                ''', unsafe_allow_html=True)
+                                
+                                # 隐藏的超时触发按钮
+                                if st.button("timeout", key="timeout_trigger"):
+                                    st.session_state.disease_progress = 100
+                                    st.session_state.game_over = True
+                                    st.session_state.penalty_log.append("抢救超时，未能及时干预")
+                                    st.rerun()
+                                
+                                # 用 CSS 把触发按钮隐藏掉
+                                st.markdown("""
+                                    <style>
+                                        div[data-testid="stButton"]:has(button[key="timeout_trigger"]) {
+                                            display: none;
+                                        }
+                                    </style>
+                                """, unsafe_allow_html=True)
+                            else:
+                                # 如果后端代码运行时发现已经超时了
+                                st.session_state.disease_progress = 100
+                                st.session_state.game_over = True
+                                st.session_state.penalty_log.append("抢救超时")
+                                st.rerun()
+                            # ======================================================================
+
                             if st.session_state.action_points > 0:
                                 for opt_key, opt_val in case["crisis"].items():
                                     if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
@@ -1036,6 +1080,11 @@ if st.session_state.screen == "game":
                                         st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
                                         st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
                                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + opt_val["disease"]))
+                                        
+                                        # 增加时间惩罚：每次做错选项扣 10 秒，正确选项扣 5 秒
+                                        time_penalty = 5 if opt_val["type"] == "correct" else 10
+                                        st.session_state.crisis_start_time -= time_penalty
+                                        
                                         if opt_val["type"] == "correct": st.session_state.crisis_correct_count += 1
                                         else:
                                             st.session_state.penalty_log.append(opt_val["label"])
