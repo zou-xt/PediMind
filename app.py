@@ -664,13 +664,6 @@ if st.session_state.screen == "game":
                     st.session_state.messages.append({"role": "assistant", "content": "（时间被拖得太久，患儿脸色发紫！）医生，快救救他！"})
                     st.rerun()
 
-        if st.session_state.time_period == 3 and st.session_state.crisis_correct_count >= 2:
-            if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
-                st.session_state.score_emergency += 20
-                st.session_state.time_period = 4
-                st.session_state.game_over = True
-                st.rerun()
-
         st.divider()
         
         if not st.session_state.game_over and not st.session_state.call_senior_used and st.session_state.time_period == 1:
