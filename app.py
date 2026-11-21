@@ -1027,8 +1027,9 @@ if st.session_state.screen == "game":
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
             
             if st.session_state.current_case == "laryngitis":
-                if os.path.exists("three_depressions.mp4"): st.video("three_depressions.mp4")
-                else: st.info("🎥 [视频占位：患儿呼吸极度费力，胸口和脖子下方随着呼吸深深凹陷]")
+                 if os.path.exists("static/three_depressions.mp4"): 
+                    st.video("static/three_depressions.mp4")
+                else:  st.info("🎥 [视频占位：患儿呼吸极度费力，胸口和脖子下方随着呼吸深深凹陷]")
             elif st.session_state.current_case == "epiglottitis":
                 st.info("🎥 [场景：患儿呈端坐位，极度惊恐，口水顺着嘴角不断流下，完全无法躺下]")
             else:
