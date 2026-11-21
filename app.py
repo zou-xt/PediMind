@@ -336,7 +336,6 @@ def render_monitor(disease_progress: int):
     elif disease_progress < 90: hr, spo2, rr, bp_sys, bp_dia, status = 160, 88, 45, 80, 40, "danger"
     else: hr, spo2, rr, bp_sys, bp_dia, status = 180, 82, 55, 60, 30, "critical"
 
-    # 注意：这里所有 CSS 的 { 和 } 都需要写成双大括号 {{ }} 因为外层是 f-string
     html_code = f"""<html><head><style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{ background:#000; overflow:hidden; font-family:'Courier New',monospace; display:flex; justify-content:center; }}
@@ -393,7 +392,6 @@ def render_monitor(disease_progress: int):
       const ctx = canvas.getContext('2d'); 
       let W, H;
 
-      // 使用 ResizeObserver 确保容器尺寸变化时画布能立即响应
       const resizeObserver = new ResizeObserver(entries => {{
           for (let entry of entries) {{
               W = entry.contentRect.width;
@@ -408,7 +406,6 @@ def render_monitor(disease_progress: int):
       }});
       resizeObserver.observe(canvas.parentElement);
 
-      // ================= 波形生成算法 =================
       function ecgSample(p) {{ 
           let v = 0; 
           if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI);
@@ -427,7 +424,6 @@ def render_monitor(disease_progress: int):
       function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.25) / 0.1, 2)) + Math.exp(-Math.pow((p - 0.55) / 0.12, 2)) * 0.3; }}
       function respSample(p) {{ return Math.sin(p * Math.PI * 2); }}
 
-      // ================= 缓冲区与渲染逻辑 =================
       const BUFFER = 500; 
       const ecgData = new Array(BUFFER).fill(0);
       const abpData = new Array(BUFFER).fill(0);
@@ -454,7 +450,6 @@ def render_monitor(disease_progress: int):
       }}
 
       function loop() {{ 
-          // 如果宽高还没准备好，就跳过这一帧
           if (!W || !H) {{ requestAnimationFrame(loop); return; }}
 
           for (let k=0; k<perFrame; k++) {{ 
@@ -474,21 +469,20 @@ def render_monitor(disease_progress: int):
           requestAnimationFrame(loop); 
       }}
 
-      // ================= 数值渲染逻辑 =================
       function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
       function updateVitals() {{ 
           document.getElementById('hr').textContent = jit(HR, 2); 
           document.getElementById('spo2').textContent = jit(SPO2, 1); 
           document.getElementById('rr').textContent = jit(RR, 1); 
           document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); 
-          if (STATUS==="critical"||STATUS==="danger") { 
+          
+          if (STATUS==="critical"||STATUS==="danger") {{ 
               document.getElementById('hr').classList.add('blink'); 
-          } else { 
+          }} else {{ 
               document.getElementById('hr').classList.remove('blink'); 
-          }
+          }}
       }}
       
-      // 启动
       updateVitals(); 
       setInterval(updateVitals, 1000);
       requestAnimationFrame(loop);
