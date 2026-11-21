@@ -1022,10 +1022,11 @@ if st.session_state.screen == "game":
                         st.session_state.disease_progress = min(100, st.session_state.disease_progress + 10)
                         st.session_state.trust_score -= 10
                         st.session_state.penalty_log.append("上级指导时答错")
-                    st.session_state.senior_mode = False; time.sleep(1.5); st.rerun()
+                    st.session_state.senior_mode = False
+                    st.rerun()
             st.stop()
 
-        # ================= 视诊（填空题） =================
+              # ================= 视诊（填空题） =================
         if st.session_state.get("visual_exam_mode", False):
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
             
@@ -1077,14 +1078,13 @@ if st.session_state.screen == "game":
                         elif st.session_state.current_case in ["foreign_body", "asthma"]:
                             if "面色发绀" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("面色发绀")
                             
-                        st.success("✅ 视诊准确！你抓住了核心体征。")
+                        st.toast("✅ 视诊准确！你抓住了核心体征。", icon="🩺") # 用 toast 替代 sleep
                     else:
                         st.session_state.trust_score -= 5
                         st.session_state.penalty_log.append(f"视诊未抓住重点：{exam_finding}")
                         st.session_state.messages.append({"role": "assistant", "content": "（家属看你观察了半天，焦急地问：“大夫，到底看出啥问题没啊？”）"})
-                        st.error("❌ 观察不够准确。你的描述未能命中该病例的核心体征。")
+                        st.toast("❌ 观察不够准确，未能命中核心体征。", icon="⚠️")
                         
-                    time.sleep(2)
                     st.session_state.visual_exam_mode = False
                     st.rerun()
 
@@ -1115,21 +1115,19 @@ if st.session_state.screen == "game":
             if st.button("吸气性喉鸣 (Stridor)", use_container_width=True):
                 if case["disease"] in ("急性感染性喉炎", "急性会厌炎"):
                     st.session_state.unlocked_clues.append("吸气性喉鸣"); st.session_state.score_diagnosis += 10
-                    st.success("✅ 判断正确！这是典型的上气道梗阻声音。")
+                    st.toast("✅ 判断正确！这是典型的上气道梗阻声音。", icon="🎯")
                 else: 
                     st.session_state.trust_score -= 5
-                    st.error("❌ 判断错误。")
-                time.sleep(1)
+                    st.toast("❌ 判断错误。", icon="❌")
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
                 
             if st.button("呼气性哮鸣音 (Wheezing)", use_container_width=True):
                 if case["disease"] == "支气管哮喘急性发作":
                     st.session_state.unlocked_clues.append("双肺哮鸣音"); st.session_state.score_diagnosis += 10
-                    st.success("✅ 判断正确！这是典型的下气道痉挛声音。")
+                    st.toast("✅ 判断正确！这是典型的下气道痉挛声音。", icon="🎯")
                 else: 
                     st.session_state.trust_score -= 5
-                    st.error("❌ 判断错误。")
-                time.sleep(1)
+                    st.toast("❌ 判断错误。", icon="❌")
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
         # ================= 聊天与初步诊断界面 =================
@@ -1190,37 +1188,58 @@ if st.session_state.screen == "game":
                                     if is_furious:
                                         system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒、焦虑和绝望！你觉得医生不靠谱。
 【核心规则】：
-1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”、“你到底会不会看！”），但【必须】顺带回答他的问题（如：“就是晚上重啊！你快给用药啊！”）。
-2. 绝对禁止完全拒绝回答，因为你是来看病的，不是来吵架的。
+1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”、“你到底会不会看！”），但【必须】顺带回答他的问题。
+2. 绝对禁止完全拒绝回答。
 3. 字数严格控制在40字以内。"""
                                     else:
-                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔，甚至有些自责。你是一个没有任何医学知识的普通家长。
+                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔。你是一个没有任何医学知识的普通家长。
 【核心规则】：
-1. 【问什么答什么】医生问什么，你答什么，绝对不要主动长篇大论罗列症状。
-2. 【严禁使用专业术语】绝对不能说出“三凹征”、“发绀”、“哮鸣音”、“喉鸣”等专业医学词汇！你只是个普通老百姓，只会用大白话。
-3. 【严禁主动报病名或特殊体征】如果医生只是泛泛地问“怎么了”、“哪不舒服”，你只能说：“孩子突然喘不上气”、“孩子一直哭闹说难受”。只有医生问到了具体的，你才具体回答（例如医生问“咳嗽声音像什么”，你答“像小狗叫”）。
-4. 【语气生动】用极其口语化、大白话回答。可以感叹“哎呀医生”、“急死我了”。
-5. 【信息不对称/隐瞒】如果是异物病例，除非医生明确问“有没有吃花生/坚果”，否则你一开始只说“吃了点饭就突然咳了”。
+1. 【问什么答什么】医生问什么，你答什么，绝对不要主动长篇大论。
+2. 【严禁使用专业术语】绝对不能说“三凹征”、“哮鸣音”等医学词汇，用大白话。
+3. 【严禁主动报病名或体征】如果医生只是泛泛地问“怎么了”，你只说：“孩子突然喘不上气”。只有医生问到具体的，你才具体回答（如“咳嗽像小狗叫”）。
+4. 【语气生动】用极其口语化回答。可以感叹“急死我了”。
+5. 【信息不对称】异物病例除非问“有没有吃花生”，否则只说“吃了点饭就咳了”。
 6. 【字数限制】严格控制在50字以内。"""
                                     
                                     api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
-                                    response = client.chat.completions.create(model=MODEL_NAME, messages=api_messages, temperature=0.65, max_tokens=120)
-                                    ai_reply = response.choices[0].message.content
-                                except: 
+                                    
+                                    # 🌟 开启流式输出，打字机效果
+                                    response = client.chat.completions.create(
+                                        model=MODEL_NAME, 
+                                        messages=api_messages, 
+                                        temperature=0.65, 
+                                        max_tokens=120,
+                                        stream=True
+                                    )
+                                    
+                                    message_placeholder = st.empty()
+                                    ai_reply = ""
+                                    for chunk in response:
+                                        if chunk.choices[0].delta.content:
+                                            ai_reply += chunk.choices[0].delta.content
+                                            with message_placeholder.container():
+                                                render_message("assistant", ai_reply + "▌", case)
+                                    message_placeholder.empty()
+                                                
+                                except Exception as e: 
                                     ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
 
                                 st.session_state.messages.append({"role": "assistant", "content": ai_reply})
                                 match_text = prompt + " " + ai_reply
                                 for clue in case["clues"]:
                                     if clue not in st.session_state.unlocked_clues and check_clue_trigger(clue, match_text):
-                                        st.session_state.unlocked_clues.append(clue); st.session_state.score_inquiry += 8; st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                        st.session_state.unlocked_clues.append(clue)
+                                        st.session_state.score_inquiry += 8
+                                        st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                         
                                         if is_furious:
                                             st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
                                             
                                         explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
                                         st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
-                            st.rerun()
+                            
+                            # 🌟 重点：删掉了这里的 st.rerun()，聊天彻底不卡，波形不再重绘！
+                            # （使用 stream 和 st.chat_input 的天然刷新特性，无需全局重绘）
 
                 elif st.session_state.time_period == 2:
                     st.info("🩺 请根据目前收集到的线索，输入您的初步诊断：")
@@ -1248,7 +1267,6 @@ if st.session_state.screen == "game":
                             st.rerun()
 
                 elif st.session_state.time_period == 3:
-                    # 急救成功拦截
                     if st.session_state.crisis_correct_count >= 2:
                         st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
                         if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
