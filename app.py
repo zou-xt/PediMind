@@ -899,7 +899,7 @@ if st.session_state.screen == "game":
             for log in st.session_state.penalty_log[-3:]: st.warning(log)
 
     # ================= 中间核心交互区 =================
-    with col_center:
+  with col_center:
         if not st.session_state.game_over:
             if st.session_state.time_period == 1: 
                 st.title("🎬 第一幕：急诊初探")
@@ -932,6 +932,7 @@ if st.session_state.screen == "game":
                     st.session_state.trust_score = 0; check_medical_dispute(); st.rerun()
             st.stop()
 
+        # 查体工具箱 (仅在自由接诊期可用)
         if not st.session_state.game_over and st.session_state.time_period == 1:
             with st.expander("🩺 体格检查与辅助检查工具箱（消耗体力）", expanded=False):
                 tab1, tab2, tab3, tab4 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊", "🧪 辅助检查"])
@@ -983,6 +984,7 @@ if st.session_state.screen == "game":
                             st.rerun()
                         elif st.session_state.action_points <= 0: st.error("体力不足！")
 
+        # 上级医生提问
         if st.session_state.get("senior_mode", False):
             st.info("📞 电话那头传来了上级医生疲惫但沉稳的声音：")
             q, options, correct_idx = "", [], 0
@@ -1023,14 +1025,14 @@ if st.session_state.screen == "game":
                     st.session_state.senior_mode = False; time.sleep(1.5); st.rerun()
             st.stop()
 
-         if st.session_state.get("visual_exam_mode", False):
+        # ================= 视诊（填空题） =================
+        if st.session_state.get("visual_exam_mode", False):
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
-
+            
             if st.session_state.current_case == "laryngitis":
-                # 🌟 确保路径带有 static/
-                if os.path.exists("static/three_depressions.mp4"):
+                if os.path.exists("static/three_depressions.mp4"): 
                     st.video("static/three_depressions.mp4")
-                else:
+                else: 
                     st.info("🎥 [视频占位：患儿呼吸极度费力，胸口和脖子下方随着呼吸深深凹陷]")
             elif st.session_state.current_case == "epiglottitis":
                 st.info("🎥 [场景：患儿呈端坐位，极度惊恐，口水顺着嘴角不断流下，完全无法躺下]")
@@ -1067,7 +1069,6 @@ if st.session_state.screen == "game":
                         st.session_state.score_inquiry += 10
                         st.session_state.messages.append({"role": "assistant", "content": f"（视诊记录：{exam_finding}。你敏锐地察觉到了病情的关键！）"})
                         
-                        # 确保视诊成功后，一定会解锁对应的查体线索！
                         if st.session_state.current_case == "laryngitis" and "三凹征" not in st.session_state.unlocked_clues: 
                             st.session_state.unlocked_clues.append("三凹征")
                         elif st.session_state.current_case == "epiglottitis":
@@ -1087,6 +1088,7 @@ if st.session_state.screen == "game":
                     st.session_state.visual_exam_mode = False
                     st.rerun()
 
+        # ================= 听诊（虚拟合成音） =================
         elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
             audio_path = f"static/{case['audio']}"
@@ -1130,6 +1132,7 @@ if st.session_state.screen == "game":
                 time.sleep(1)
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
+        # ================= 聊天与初步诊断界面 =================
         else:
             with st.container(height=450):
                 for msg in st.session_state.messages: 
@@ -1170,10 +1173,9 @@ if st.session_state.screen == "game":
                                 st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
                                 if check_medical_dispute(): st.rerun()
                             
-                            # 共情安抚成功分支
                             elif is_empathy:
                                 st.session_state.trust_score = min(100, st.session_state.trust_score + 20)
-                                st.session_state.score_empathy += 10  # 加分，雷达图现在会动
+                                st.session_state.score_empathy += 10
                                 st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                 st.session_state.messages.append({"role": "assistant", "content": "（家属愣了一下，情绪稍微平复了一些）：“医生，求您一定要救救孩子……”"})
                                 
@@ -1246,7 +1248,7 @@ if st.session_state.screen == "game":
                             st.rerun()
 
                 elif st.session_state.time_period == 3:
-                    # 急救成功拦截，防止连点导致病情度溢出为负数，并直接锁定胜局
+                    # 急救成功拦截
                     if st.session_state.crisis_correct_count >= 2:
                         st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
                         if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
@@ -1276,7 +1278,6 @@ if st.session_state.screen == "game":
                                 st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
                                 st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
                                 
-                                # 限制病情度范围
                                 new_progress = st.session_state.disease_progress + opt_val["disease"]
                                 st.session_state.disease_progress = max(0, min(100, new_progress))
                                 
