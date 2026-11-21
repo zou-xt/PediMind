@@ -128,14 +128,19 @@ CLUE_EXPLANATIONS = {
 }
 
 def check_clue_trigger(clue: str, prompt: str) -> bool:
+    # 🚨 核心修改：把这些体征线索列为“查体专属”，聊天绝不触发！
+    EXAM_ONLY_CLUES = ["三凹征", "吸气性喉鸣", "面色发绀", "呼吸音不对称", "双肺哮鸣音", "流涎", "拒绝平卧", "吞咽困难"]
+    if clue in EXAM_ONLY_CLUES:
+        return False 
+
     p = prompt.lower()
     if clue in CLUE_KEYWORDS:
         if any(kw in p for kw in CLUE_KEYWORDS[clue]): return True
     if clue == "犬吠样咳嗽" and ("咳" in p or "小狗" in p or "空空" in p): return True
     elif clue == "夜间加重" and any(k in p for k in ["晚上", "夜里", "半夜"]): return True
-    elif clue == "三凹征" and any(k in p for k in ["喘", "呼吸", "凹", "陷"]): return True
     elif clue == "进食呛咳史" and any(k in p for k in ["吃", "呛", "花生", "异物"]): return True
     elif clue == "既往哮喘史" and any(k in p for k in ["以前", "既往", "喘过"]): return True
+    elif clue == "高热" and any(k in p for k in ["烧", "烫"]): return True
     return False
 
 def check_medical_dispute():
@@ -246,7 +251,6 @@ if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())[:8]
         st.query_params["pid"] = st.session_state.player_id
 
-# 🌟 极致 UI 质感 CSS
 FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');"
 
 CHAT_SPECIFIC_CSS = """
@@ -463,6 +467,7 @@ def build_parent_prompt(case, trust_score, disease_progress, unlocked_clues, is_
 5. 如果医生问的东西你刚说过，可以不耐烦地说"我刚才不是说了吗"。
 6. 每次回复不超过 2 句话，像真人说话一样自然，可以带叹气、哭腔、反问。
 7. 如果医生态度冷漠或凶你，你要发火；如果医生安慰你，你会稍微缓和。
+8. **【绝对红线】**你是个普通家长，你只能描述孩子的“主观感受”（比如：喘不上气、不肯躺下、一直流口水、像小狗叫）。**严禁你主动向医生描述具体的客观体征**（如：胸口凹陷了、锁骨凹陷了、脸色发紫了、有哮鸣音了）。这些必须由医生自己去“看”或“听”才能发现！
 """
 
 # ================= 7. 页面路由 =================
@@ -613,7 +618,6 @@ if st.session_state.screen == "game":
         st.markdown(f"### 🩺 病例：{case['name']}")
         render_sidebar_achievements(st.session_state.current_case)
 
-    # 顶部极简仪表盘
     st.markdown(f"""
     <div style="display: flex; gap: 20px; align-items: center; background: {"rgba(255,255,255,0.03)" if st.session_state.theme == "night" else "#ffffff"}; padding: 15px 25px; border-radius: 16px; border: 1px solid {"rgba(255,255,255,0.08)" if st.session_state.theme == "night" else "#e2e8f0"}; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);">
         <div style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
@@ -836,7 +840,7 @@ if st.session_state.screen == "game":
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
             if st.session_state.current_case == "laryngitis":
                 if os.path.exists("static/three_depressions.mp4"): st.video("static/three_depressions.mp4")
-                else: st.info("🎥 [视频占位：患儿呼吸极度费力，胸口和脖子下方随着呼吸深深凹陷]")
+                else: st.info("🎥 [视频占位：患儿呼吸极度费力，你可以清楚地看到，他吸气时，**胸口上方和脖子下面深深地凹陷了进去**，还伴有像小狗叫一样的咳嗽声]")
             elif st.session_state.current_case == "epiglottitis": st.info("🎥 [场景：患儿呈端坐位，极度惊恐，口水顺着嘴角不断流下，完全无法躺下]")
             else: st.info("🎥 [场景：患儿端坐呼吸，满头大汗，嘴唇发紫，鼻翼扇动]")
 
@@ -886,12 +890,14 @@ if st.session_state.screen == "game":
             st.write("### 请判断这是什么声音：")
             if st.button("吸气性喉鸣 (Stridor)", use_container_width=True):
                 if case["disease"] in ("急性感染性喉炎", "急性会厌炎"):
-                    st.session_state.unlocked_clues.append("吸气性喉鸣"); st.session_state.score_diagnosis += 10; st.toast("✅ 判断正确！", icon="🎯")
+                    if "吸气性喉鸣" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("吸气性喉鸣")
+                    st.session_state.score_diagnosis += 10; st.toast("✅ 判断正确！", icon="🎯")
                 else: st.session_state.trust_score -= 5; st.toast("❌ 判断错误。", icon="❌")
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
             if st.button("呼气性哮鸣音 (Wheezing)", use_container_width=True):
                 if case["disease"] == "支气管哮喘急性发作":
-                    st.session_state.unlocked_clues.append("双肺哮鸣音"); st.session_state.score_diagnosis += 10; st.toast("✅ 判断正确！", icon="🎯")
+                    if "双肺哮鸣音" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("双肺哮鸣音")
+                    st.session_state.score_diagnosis += 10; st.toast("✅ 判断正确！", icon="🎯")
                 else: st.session_state.trust_score -= 5; st.toast("❌ 判断错误。", icon="❌")
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
@@ -1090,6 +1096,7 @@ if st.session_state.screen == "game":
                                         st.session_state.disease_progress = 100
                                         st.session_state.game_over = True
                                     st.rerun()
+
             chat_interface()
             
     # ================= 第四幕：结案复盘 =================
