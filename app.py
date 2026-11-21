@@ -1131,195 +1131,198 @@ if st.session_state.screen == "game":
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
         # ================= 聊天与初步诊断界面 =================
-        else:
-            with st.container(height=450):
-                for msg in st.session_state.messages: 
-                    render_message(msg["role"], msg["content"], case)
+ else:
+            # 🌟 核心重构：使用 @st.fragment 局部刷新聊天区，绝不重绘左侧波形
+            @st.fragment
+            def chat_interface():
+                with st.container(height=450):
+                    for msg in st.session_state.messages: 
+                        render_message(msg["role"], msg["content"], case)
 
-            if not st.session_state.game_over:
-                if st.session_state.time_period == 1:
-                    st.write("💡 **快捷问诊：**")
-                    q_cols = st.columns(3)
-                    if st.session_state.current_case == "laryngitis":
-                        quick_prompts = ["咳嗽声音什么样？", "晚上更严重吗？", "少废话，赶紧办住院！"]
-                    else:
-                        quick_prompts = ["吃了什么东西？", "有没有脸色发紫？", "别哭了，到底怎么回事！"]
-                    
-                    prompt = None
-                    for i, q in enumerate(quick_prompts):
-                        if q_cols[i].button(q, use_container_width=True): prompt = q
-
-                    chat_val = st.chat_input("输入问诊、查体要求或安抚话语...")
-                    if chat_val: prompt = chat_val
-                    
-                    if prompt:
-                        if st.session_state.action_points <= 0: st.warning("体力已用完，请尽快在左侧点击【结束接诊，给出诊断】或准备急救。")
+                if not st.session_state.game_over:
+                    if st.session_state.time_period == 1:
+                        st.write("💡 **快捷问诊：**")
+                        q_cols = st.columns(3)
+                        if st.session_state.current_case == "laryngitis":
+                            quick_prompts = ["咳嗽声音什么样？", "晚上更严重吗？", "少废话，赶紧办住院！"]
                         else:
-                            st.session_state.action_points -= 1
-                            st.session_state.messages.append({"role": "user", "content": prompt})
-                            
-                            is_furious = st.session_state.trust_score <= 15
-                            cold_words = ["闭嘴", "烦死了", "别吵", "赶紧的", "少废话", "按我说的做", "滚", "出去", "别哭了"]
-                            empathy_words = ["别急", "不要急", "理解", "放心", "辛苦", "我知道", "我懂", "相信", "安抚", "冷静"]
-                            medical_keywords = ["疼", "痛", "咳", "喘", "烧", "吃", "喝", "拉", "吐", "睡", "精神", "怎么", "多久", "什么", "哪", "时", "检查", "听", "看", "摸", "病", "症", "大小便", "颜色", "呼吸", "胸口", "晚上", "半夜", "夜里", "加重", "白天", "过敏", "呛"]
-                            
-                            is_empathy = any(w in prompt for w in empathy_words)
-                            is_chitchat = not any(k in prompt for k in medical_keywords) and not is_empathy and len(prompt) > 2
-                            
-                            if any(w in prompt for w in cold_words):
-                                st.session_state.trust_score -= 30
-                                st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
-                                if check_medical_dispute(): st.rerun()
-                            
-                            elif is_empathy:
-                                st.session_state.trust_score = min(100, st.session_state.trust_score + 20)
-                                st.session_state.score_empathy += 10
-                                st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
-                                st.session_state.messages.append({"role": "assistant", "content": "（家属愣了一下，情绪稍微平复了一些）：“医生，求您一定要救救孩子……”"})
-                                
-                            elif is_chitchat:
-                                st.session_state.trust_score -= 5
-                                st.session_state.penalty_log.append("问诊时废话连篇")
-                                st.session_state.messages.append({"role": "assistant", "content": "（家属急得直跺脚）：“医生！都火烧眉毛了您怎么还有心思问这个！求您快看看孩子吧！”"})
-                                st.session_state.disease_progress += 2 
-                                if check_medical_dispute(): st.rerun()
+                            quick_prompts = ["吃了什么东西？", "有没有脸色发紫？", "别哭了，到底怎么回事！"]
+                        
+                        prompt = None
+                        for i, q in enumerate(quick_prompts):
+                            if q_cols[i].button(q, use_container_width=True): prompt = q
+
+                        chat_val = st.chat_input("输入问诊、查体要求或安抚话语...")
+                        if chat_val: prompt = chat_val
+                        
+                        if prompt:
+                            if st.session_state.action_points <= 0: 
+                                st.warning("体力已用完，请尽快在左侧点击【结束接诊，给出诊断】或准备急救。")
                             else:
-                                try:
-                                    if is_furious:
-                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒、焦虑和绝望！你觉得医生不靠谱。
+                                st.session_state.action_points -= 1
+                                st.session_state.messages.append({"role": "user", "content": prompt})
+                                
+                                is_furious = st.session_state.trust_score <= 15
+                                cold_words = ["闭嘴", "烦死了", "别吵", "赶紧的", "少废话", "按我说的做", "滚", "出去", "别哭了"]
+                                empathy_words = ["别急", "不要急", "理解", "放心", "辛苦", "我知道", "我懂", "相信", "安抚", "冷静"]
+                                medical_keywords = ["疼", "痛", "咳", "喘", "烧", "吃", "喝", "拉", "吐", "睡", "精神", "怎么", "多久", "什么", "哪", "时", "检查", "听", "看", "摸", "病", "症", "大小便", "颜色", "呼吸", "胸口", "晚上", "半夜", "夜里", "加重", "白天", "过敏", "呛"]
+                                
+                                is_empathy = any(w in prompt for w in empathy_words)
+                                is_chitchat = not any(k in prompt for k in medical_keywords) and not is_empathy and len(prompt) > 2
+                                
+                                if any(w in prompt for w in cold_words):
+                                    st.session_state.trust_score -= 30
+                                    st.session_state.messages.append({"role": "assistant", "content": "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"})
+                                    if check_medical_dispute(): st.rerun()
+                                
+                                elif is_empathy:
+                                    st.session_state.trust_score = min(100, st.session_state.trust_score + 20)
+                                    st.session_state.score_empathy += 10
+                                    st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+                                    st.session_state.messages.append({"role": "assistant", "content": "（家属愣了一下，情绪稍微平复了一些）：“医生，求您一定要救救孩子……”"})
+                                    
+                                elif is_chitchat:
+                                    st.session_state.trust_score -= 5
+                                    st.session_state.penalty_log.append("问诊时废话连篇")
+                                    st.session_state.messages.append({"role": "assistant", "content": "（家属急得直跺脚）：“医生！都火烧眉毛了您怎么还有心思问这个！求您快看看孩子吧！”"})
+                                    st.session_state.disease_progress += 2 
+                                    if check_medical_dispute(): st.rerun()
+                                else:
+                                    try:
+                                        if is_furious:
+                                            system_prompt = f"""你正在扮演：{case['ai_role']}。你现在极度愤怒、焦虑和绝望！你觉得医生不靠谱。
 【核心规则】：
-1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”、“你到底会不会看！”），但【必须】顺带回答他的问题。
+1. 如果医生问医疗问题，你可以先发火抱怨（如“都什么时候了你还问！”），但【必须】顺带回答他的问题。
 2. 绝对禁止完全拒绝回答。
 3. 字数严格控制在40字以内。"""
-                                    else:
-                                        system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔。你是一个没有任何医学知识的普通家长。
+                                        else:
+                                            system_prompt = f"""你正在扮演：{case['ai_role']}。你现在心急如焚、带着哭腔。你是一个没有任何医学知识的普通家长。
 【核心规则】：
-1. 【问什么答什么】医生问什么，你答什么，绝对不要主动长篇大论。
-2. 【严禁使用专业术语】绝对不能说“三凹征”、“哮鸣音”等医学词汇，用大白话。
-3. 【严禁主动报病名或体征】如果医生只是泛泛地问“怎么了”，你只说：“孩子突然喘不上气”。只有医生问到具体的，你才具体回答（如“咳嗽像小狗叫”）。
-4. 【语气生动】用极其口语化回答。可以感叹“急死我了”。
-5. 【信息不对称】异物病例除非问“有没有吃花生”，否则只说“吃了点饭就咳了”。
-6. 【字数限制】严格控制在50字以内。"""
-                                    
-                                    api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
-                                    
-                                    # 🌟 开启流式输出，打字机效果
-                                    response = client.chat.completions.create(
-                                        model=MODEL_NAME, 
-                                        messages=api_messages, 
-                                        temperature=0.65, 
-                                        max_tokens=120,
-                                        stream=True
-                                    )
-                                    
-                                    message_placeholder = st.empty()
-                                    ai_reply = ""
-                                    for chunk in response:
-                                        if chunk.choices[0].delta.content:
-                                            ai_reply += chunk.choices[0].delta.content
-                                            with message_placeholder.container():
-                                                render_message("assistant", ai_reply + "▌", case)
-                                    message_placeholder.empty()
-                                                
-                                except Exception as e: 
-                                    ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
-
-                                st.session_state.messages.append({"role": "assistant", "content": ai_reply})
-                                match_text = prompt + " " + ai_reply
-                                for clue in case["clues"]:
-                                    if clue not in st.session_state.unlocked_clues and check_clue_trigger(clue, match_text):
-                                        st.session_state.unlocked_clues.append(clue)
-                                        st.session_state.score_inquiry += 8
-                                        st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
+1. 【问什么答什么】医生问什么，你答什么。
+2. 【严禁使用专业术语】绝对不能说“三凹征”等词汇。
+3. 【严禁主动报病名】如果医生只是泛泛地问“怎么了”，你只说：“孩子突然喘不上气”。
+4. 【字数限制】严格控制在50字以内。"""
                                         
-                                        if is_furious:
-                                            st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
+                                        api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+                                        
+                                        # 开启流式输出
+                                        response = client.chat.completions.create(
+                                            model=MODEL_NAME, 
+                                            messages=api_messages, 
+                                            temperature=0.65, 
+                                            max_tokens=120,
+                                            stream=True
+                                        )
+                                        
+                                        message_placeholder = st.empty()
+                                        ai_reply = ""
+                                        for chunk in response:
+                                            if chunk.choices[0].delta.content:
+                                                ai_reply += chunk.choices[0].delta.content
+                                                with message_placeholder.container():
+                                                    render_message("assistant", ai_reply + "▌", case)
+                                        message_placeholder.empty()
+                                                    
+                                    except Exception as e: 
+                                        ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
+
+                                    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+                                    match_text = prompt + " " + ai_reply
+                                    for clue in case["clues"]:
+                                        if clue not in st.session_state.unlocked_clues and check_clue_trigger(clue, match_text):
+                                            st.session_state.unlocked_clues.append(clue)
+                                            st.session_state.score_inquiry += 8
+                                            st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                             
-                                        explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
-                                        st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
-                            
-                            # 🌟 重点：删掉了这里的 st.rerun()，聊天彻底不卡，波形不再重绘！
-                            # （使用 stream 和 st.chat_input 的天然刷新特性，无需全局重绘）
+                                            if is_furious:
+                                                st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
+                                                
+                                            explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
+                                            st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
+                                
+                                # 🌟 关键！处理完逻辑后，只刷新 chat_interface 这个局部，左侧波形绝对不动
+                                st.rerun(scope="fragment")
 
-                elif st.session_state.time_period == 2:
-                    st.info("🩺 请根据目前收集到的线索，输入您的初步诊断：")
-                    diag_input = st.text_input("输入疾病名称（如：急性喉炎、气道异物等）：")
-                    
-                    if st.button("确认诊断，进入抢救", type="primary", use_container_width=True):
-                        if not diag_input.strip():
-                            st.error("请输入诊断结果！")
-                        else:
-                            if any(k in diag_input for k in case["disease"]):
-                                st.session_state.score_diagnosis += 15
-                                st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！初步考虑：{case['disease']}。"})
-                                st.session_state.disease_progress = max(50, st.session_state.disease_progress) 
-                            else:
-                                st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
-                                st.session_state.trust_score -= 20
-                                st.session_state.penalty_log.append(f"误诊为：{diag_input}")
-                                st.session_state.messages.append({"role": "assistant", "content": f"❌ 误诊！你给出的“{diag_input}”方向错误，病情加重！"})
-                            
-                            st.session_state.diagnosis_processed = True
-                            st.session_state.time_period = 3
-                            st.session_state.action_points = 3 if st.session_state.game_mode == "easy" else 2
-                            st.session_state.crisis_start_time = time.time()
-                            st.session_state.messages.append({"role": "assistant", "content": "（就在你思考的瞬间，患儿突发严重的呼吸困难！）"})
-                            st.rerun()
-
-                elif st.session_state.time_period == 3:
-                    if st.session_state.crisis_correct_count >= 2:
-                        st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
-                        if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
-                            st.session_state.score_emergency += 20
-                            st.session_state.time_period = 4
-                            st.session_state.game_over = True
-                            st.session_state.disease_progress = min(40, max(10, st.session_state.disease_progress))
-                            st.rerun()
-                        st.stop()
+                    elif st.session_state.time_period == 2:
+                        st.info("🩺 请根据目前收集到的线索，输入您的初步诊断：")
+                        diag_input = st.text_input("输入疾病名称（如：急性喉炎、气道异物等）：")
                         
-                    if st.session_state.game_over:
-                        st.stop()
-
-                    elapsed = time.time() - st.session_state.crisis_start_time
-                    time_left = max(0, 90 - int(elapsed))
-                    st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
-                    
-                    if time_left <= 0: 
-                        st.session_state.disease_progress = 100
-                        st.session_state.game_over = True
-                        st.rerun()
-                    
-                    if st.session_state.action_points > 0:
-                        for opt_key, opt_val in case["crisis"].items():
-                            if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
-                                st.session_state.action_points -= 1
-                                st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
-                                st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
-                                
-                                new_progress = st.session_state.disease_progress + opt_val["disease"]
-                                st.session_state.disease_progress = max(0, min(100, new_progress))
-                                
-                                if opt_val["type"] == "correct": 
-                                    st.session_state.crisis_correct_count += 1
+                        if st.button("确认诊断，进入抢救", type="primary", use_container_width=True):
+                            if not diag_input.strip():
+                                st.error("请输入诊断结果！")
+                            else:
+                                if any(k in diag_input for k in case["disease"]):
+                                    st.session_state.score_diagnosis += 15
+                                    st.session_state.messages.append({"role": "assistant", "content": f"✅ 诊断正确！初步考虑：{case['disease']}。"})
+                                    st.session_state.disease_progress = max(50, st.session_state.disease_progress) 
                                 else:
-                                    st.session_state.penalty_log.append(opt_val["label"])
-                                    st.session_state.trust_score -= 25
-                                    if st.session_state.disease_progress >= 100: 
-                                        st.session_state.game_over = True
-                                    if check_medical_dispute(): 
-                                        st.rerun()
+                                    st.session_state.disease_progress = min(100, st.session_state.disease_progress + 25)
+                                    st.session_state.trust_score -= 20
+                                    st.session_state.penalty_log.append(f"误诊为：{diag_input}")
+                                    st.session_state.messages.append({"role": "assistant", "content": f"❌ 误诊！你给出的“{diag_input}”方向错误，病情加重！"})
+                                
+                                st.session_state.diagnosis_processed = True
+                                st.session_state.time_period = 3
+                                st.session_state.action_points = 3 if st.session_state.game_mode == "easy" else 2
+                                st.session_state.crisis_start_time = time.time()
+                                st.session_state.messages.append({"role": "assistant", "content": "（就在你思考的瞬间，患儿突发严重的呼吸困难！）"})
+                                # 进入下一幕属于全局状态改变，需要全局刷新
                                 st.rerun()
-                    else:
-                        st.warning("⚠️ 你的体力已耗尽，无法进行更多操作！等待命运裁决...")
-                        if st.button("等待结果"):
-                            if st.session_state.crisis_correct_count >= 2:
+
+                    elif st.session_state.time_period == 3:
+                        if st.session_state.crisis_correct_count >= 2:
+                            st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
+                            if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
+                                st.session_state.score_emergency += 20
                                 st.session_state.time_period = 4
                                 st.session_state.game_over = True
-                                st.session_state.disease_progress = max(10, st.session_state.disease_progress)
-                            else:
-                                st.session_state.disease_progress = 100
-                                st.session_state.game_over = True
+                                st.session_state.disease_progress = min(40, max(10, st.session_state.disease_progress))
+                                st.rerun()
+                            return # 使用 return 替代 st.stop()，避免影响外部
+                            
+                        elapsed = time.time() - st.session_state.crisis_start_time
+                        time_left = max(0, 90 - int(elapsed))
+                        st.error(f"⏰ 紧急抢救倒计时：{time_left} 秒！请选择：")
+                        
+                        if time_left <= 0: 
+                            st.session_state.disease_progress = 100
+                            st.session_state.game_over = True
                             st.rerun()
+                        
+                        if st.session_state.action_points > 0:
+                            for opt_key, opt_val in case["crisis"].items():
+                                if st.button(opt_val["label"], key=f"crisis_{opt_key}", use_container_width=True):
+                                    st.session_state.action_points -= 1
+                                    st.session_state.messages.append({"role": "user", "content": opt_val["label"]})
+                                    st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
+                                    
+                                    new_progress = st.session_state.disease_progress + opt_val["disease"]
+                                    st.session_state.disease_progress = max(0, min(100, new_progress))
+                                    
+                                    if opt_val["type"] == "correct": 
+                                        st.session_state.crisis_correct_count += 1
+                                    else:
+                                        st.session_state.penalty_log.append(opt_val["label"])
+                                        st.session_state.trust_score -= 25
+                                        if st.session_state.disease_progress >= 100: 
+                                            st.session_state.game_over = True
+                                        if check_medical_dispute(): 
+                                            st.rerun()
+                                    st.rerun() # 急救阶段数值变化大，可以全局刷新
+                        else:
+                            st.warning("⚠️ 你的体力已耗尽，无法进行更多操作！等待命运裁决...")
+                            if st.button("等待结果"):
+                                if st.session_state.crisis_correct_count >= 2:
+                                    st.session_state.time_period = 4
+                                    st.session_state.game_over = True
+                                    st.session_state.disease_progress = max(10, st.session_state.disease_progress)
+                                else:
+                                    st.session_state.disease_progress = 100
+                                    st.session_state.game_over = True
+                                st.rerun()
+
+            # 🌟 执行局部刷新函数
+            chat_interface()
     # ================= 第四幕：结案复盘 =================
     if st.session_state.game_over:
         st.divider(); st.header("🩺 带教老师复盘")
