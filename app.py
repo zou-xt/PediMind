@@ -899,7 +899,7 @@ if st.session_state.screen == "game":
             for log in st.session_state.penalty_log[-3:]: st.warning(log)
 
     # ================= 中间核心交互区 =================
-  with col_center:
+ with col_center:
         if not st.session_state.game_over:
             if st.session_state.time_period == 1: 
                 st.title("🎬 第一幕：急诊初探")
@@ -1302,7 +1302,6 @@ if st.session_state.screen == "game":
                                 st.session_state.disease_progress = 100
                                 st.session_state.game_over = True
                             st.rerun()
-
     # ================= 第四幕：结案复盘 =================
     if st.session_state.game_over:
         st.divider(); st.header("🩺 带教老师复盘")
