@@ -899,7 +899,7 @@ if st.session_state.screen == "game":
             for log in st.session_state.penalty_log[-3:]: st.warning(log)
 
     # ================= 中间核心交互区 =================
- with col_center:
+    with col_center:
         if not st.session_state.game_over:
             if st.session_state.time_period == 1: 
                 st.title("🎬 第一幕：急诊初探")
