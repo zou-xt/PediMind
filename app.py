@@ -920,7 +920,7 @@ if st.session_state.screen == "game":
             with col_calm1:
                 if st.button("1. （共情安抚）\n我理解您，孩子生病您最难受，请相信我。", use_container_width=True):
                     st.session_state.trust_score += 20; st.session_state.calming_down = True
-                    st.session_state.disease_progress += 5; st.success("✅ 家属情绪勉强平复..."); time.sleep(1); st.rerun()
+                    st.session_state.disease_progress += 5; st.toast("✅ 家属情绪勉强平复...", icon="💬"); st.rerun()
             with col_calm2:
                 if st.button("2. （强词夺理）\n病情本来就会恶化，你得听我的！", use_container_width=True):
                     st.session_state.trust_score -= 15; st.session_state.disease_progress += 15
@@ -932,7 +932,7 @@ if st.session_state.screen == "game":
                     st.session_state.trust_score = 0; check_medical_dispute(); st.rerun()
             st.stop()
 
-        # 查体工具箱 (仅在自由接诊期可用)
+        # 查体工具箱
         if not st.session_state.game_over and st.session_state.time_period == 1:
             with st.expander("🩺 体格检查与辅助检查工具箱（消耗体力）", expanded=False):
                 tab1, tab2, tab3, tab4 = st.tabs(["👁️ 视诊", "👂 听诊", "🖐️ 触诊", "🧪 辅助检查"])
@@ -1022,11 +1022,10 @@ if st.session_state.screen == "game":
                         st.session_state.disease_progress = min(100, st.session_state.disease_progress + 10)
                         st.session_state.trust_score -= 10
                         st.session_state.penalty_log.append("上级指导时答错")
-                    st.session_state.senior_mode = False
-                    st.rerun()
+                    st.session_state.senior_mode = False; st.rerun()
             st.stop()
 
-              # ================= 视诊（填空题） =================
+        # ================= 视诊 =================
         if st.session_state.get("visual_exam_mode", False):
             st.warning("👁️ 视诊中：请仔细观察，并在下方输入您的发现。")
             
@@ -1078,7 +1077,7 @@ if st.session_state.screen == "game":
                         elif st.session_state.current_case in ["foreign_body", "asthma"]:
                             if "面色发绀" not in st.session_state.unlocked_clues: st.session_state.unlocked_clues.append("面色发绀")
                             
-                        st.toast("✅ 视诊准确！你抓住了核心体征。", icon="🩺") # 用 toast 替代 sleep
+                        st.toast("✅ 视诊准确！你抓住了核心体征。", icon="🩺")
                     else:
                         st.session_state.trust_score -= 5
                         st.session_state.penalty_log.append(f"视诊未抓住重点：{exam_finding}")
@@ -1088,7 +1087,7 @@ if st.session_state.screen == "game":
                     st.session_state.visual_exam_mode = False
                     st.rerun()
 
-        # ================= 听诊（虚拟合成音） =================
+        # ================= 听诊 =================
         elif st.session_state.auscultation_mode:
             st.warning("🩺 听诊音频：")
             audio_path = f"static/{case['audio']}"
@@ -1130,9 +1129,8 @@ if st.session_state.screen == "game":
                     st.toast("❌ 判断错误。", icon="❌")
                 st.session_state.auscultation_mode = False; st.session_state.auscultation_completed = True; st.rerun()
 
-        # ================= 聊天与初步诊断界面 =================
- else:
-            # 🌟 核心重构：使用 @st.fragment 局部刷新聊天区，绝不重绘左侧波形
+        # ================= 聊天与初步诊断 =================
+        else:
             @st.fragment
             def chat_interface():
                 with st.container(height=450):
@@ -1240,7 +1238,6 @@ if st.session_state.screen == "game":
                                             explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
                                             st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
                                 
-                                # 🌟 关键！处理完逻辑后，只刷新 chat_interface 这个局部，左侧波形绝对不动
                                 st.rerun(scope="fragment")
 
                     elif st.session_state.time_period == 2:
@@ -1266,7 +1263,6 @@ if st.session_state.screen == "game":
                                 st.session_state.action_points = 3 if st.session_state.game_mode == "easy" else 2
                                 st.session_state.crisis_start_time = time.time()
                                 st.session_state.messages.append({"role": "assistant", "content": "（就在你思考的瞬间，患儿突发严重的呼吸困难！）"})
-                                # 进入下一幕属于全局状态改变，需要全局刷新
                                 st.rerun()
 
                     elif st.session_state.time_period == 3:
@@ -1278,7 +1274,7 @@ if st.session_state.screen == "game":
                                 st.session_state.game_over = True
                                 st.session_state.disease_progress = min(40, max(10, st.session_state.disease_progress))
                                 st.rerun()
-                            return # 使用 return 替代 st.stop()，避免影响外部
+                            return 
                             
                         elapsed = time.time() - st.session_state.crisis_start_time
                         time_left = max(0, 90 - int(elapsed))
@@ -1308,7 +1304,7 @@ if st.session_state.screen == "game":
                                             st.session_state.game_over = True
                                         if check_medical_dispute(): 
                                             st.rerun()
-                                    st.rerun() # 急救阶段数值变化大，可以全局刷新
+                                    st.rerun() 
                         else:
                             st.warning("⚠️ 你的体力已耗尽，无法进行更多操作！等待命运裁决...")
                             if st.button("等待结果"):
@@ -1321,7 +1317,7 @@ if st.session_state.screen == "game":
                                     st.session_state.game_over = True
                                 st.rerun()
 
-            # 🌟 执行局部刷新函数
+            # 调用局部刷新组件
             chat_interface()
     # ================= 第四幕：结案复盘 =================
     if st.session_state.game_over:
