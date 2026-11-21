@@ -336,21 +336,29 @@ def render_monitor(disease_progress: int):
     elif disease_progress < 90: hr, spo2, rr, bp_sys, bp_dia, status = 160, 88, 45, 80, 40, "danger"
     else: hr, spo2, rr, bp_sys, bp_dia, status = 180, 82, 55, 60, 30, "critical"
 
+    # 注意：这里所有 CSS 的 { 和 } 都需要写成双大括号 {{ }} 因为外层是 f-string
     html_code = f"""<html><head><style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{ background:#000; overflow:hidden; font-family:'Courier New',monospace; display:flex; justify-content:center; }}
       .monitor {{ position:relative; width:100%; max-width: 480px; height:280px; background:#000; border-radius:6px; border:2px solid #222; overflow:hidden; display:flex; box-shadow: inset 0 0 20px rgba(0,0,0,0.9); }}
-      .wave-area {{ flex: 1; position: relative; background:#050505; }} 
+      
+      /* 波形区域 */
+      .wave-area {{ flex: 1; position: relative; background:#050505; min-width: 0; }} 
       canvas {{ display:block; width:100%; height:100%; }}
-      .vitals {{ width: 130px; background: #000; padding: 10px 10px; display: flex; flex-direction: column; justify-content: space-around; border-left: 1px solid #222; }}
-      .vital-item {{ display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }}
+      
+      /* 右侧数值面板 */
+      .vitals {{ width: 120px; background: #000; padding: 12px 10px; display: flex; flex-direction: column; justify-content: space-between; border-left: 1px solid #222; flex-shrink: 0; }}
+      .vital-item {{ display: flex; flex-direction: column; align-items: flex-start; line-height: 1; padding-bottom: 4px; }}
       .vital-label {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
-      .vital-value {{ font-size: 38px; font-weight: bold; font-family: 'Arial', sans-serif; }}
+      .vital-value {{ font-size: 32px; font-weight: bold; font-family: 'Arial', sans-serif; line-height: 1.1; }}
       .vital-unit  {{ font-size: 10px; color: #666; margin-top: 2px; }}
+      
+      /* 颜色定义 */
       .c-green {{ color:#00ff00; text-shadow: 0 0 8px rgba(0,255,0,0.4); }} 
       .c-red   {{ color:#ff3333; text-shadow: 0 0 8px rgba(255,51,51,0.4); }}
       .c-yellow{{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.4); }}
       .c-white {{ color:#ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.4); }}
+      
       .blink {{ animation:blink 0.8s infinite; }} 
       @keyframes blink {{ 50% {{ opacity:0.3; }} }}
     </style></head><body>
@@ -384,14 +392,23 @@ def render_monitor(disease_progress: int):
       const canvas = document.getElementById('monitorCanvas'); 
       const ctx = canvas.getContext('2d'); 
       let W, H;
-      function resize() {{ 
-          const r = canvas.parentElement.getBoundingClientRect(); 
-          canvas.width = r.width * devicePixelRatio; 
-          canvas.height = r.height * devicePixelRatio; 
-          ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); 
-          W = r.width; H = r.height; 
-      }}
-      window.addEventListener('resize', resize); resize();
+
+      // 使用 ResizeObserver 确保容器尺寸变化时画布能立即响应
+      const resizeObserver = new ResizeObserver(entries => {{
+          for (let entry of entries) {{
+              W = entry.contentRect.width;
+              H = entry.contentRect.height;
+              if(W === 0 || H === 0) continue;
+              canvas.width = W * devicePixelRatio; 
+              canvas.height = H * devicePixelRatio; 
+              canvas.style.width = W + 'px';
+              canvas.style.height = H + 'px';
+              ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); 
+          }}
+      }});
+      resizeObserver.observe(canvas.parentElement);
+
+      // ================= 波形生成算法 =================
       function ecgSample(p) {{ 
           let v = 0; 
           if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI);
@@ -409,28 +426,37 @@ def render_monitor(disease_progress: int):
       }}
       function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.25) / 0.1, 2)) + Math.exp(-Math.pow((p - 0.55) / 0.12, 2)) * 0.3; }}
       function respSample(p) {{ return Math.sin(p * Math.PI * 2); }}
+
+      // ================= 缓冲区与渲染逻辑 =================
       const BUFFER = 500; 
       const ecgData = new Array(BUFFER).fill(0);
       const abpData = new Array(BUFFER).fill(0);
       const plethData = new Array(BUFFER).fill(0);
       const respData = new Array(BUFFER).fill(0);
+      
       let ecgPhase = 0, abpPhase = 0, plethPhase = 0, respPhase = 0; 
       const cycleDur = 60 / HR, sampleInterval = 0.008, perFrame = 2;
       const dEcgPhase = (sampleInterval / cycleDur) * perFrame;
       const dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
+
       function drawGrid(h4) {{ 
           ctx.lineWidth = 0.5; 
           ctx.strokeStyle = "rgba(255,255,255,0.03)"; 
           for (let x=0; x<W; x+=15) {{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }} 
           for (let i=0; i<4; i++) {{ let y = i * h4; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }}
       }}
+
       function drawWave(data, h_offset, h_region, color, amp) {{ 
           const step = W / BUFFER; const midY = h_offset + h_region * 0.6; 
           ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.0; ctx.lineJoin = 'round'; ctx.shadowBlur = 4; ctx.shadowColor = color; 
           for (let i=0; i<BUFFER; i++) {{ const x = i*step, y = midY - data[i]*amp; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }} 
           ctx.stroke(); ctx.shadowBlur = 0; 
       }}
+
       function loop() {{ 
+          // 如果宽高还没准备好，就跳过这一帧
+          if (!W || !H) {{ requestAnimationFrame(loop); return; }}
+
           for (let k=0; k<perFrame; k++) {{ 
               ecgPhase = (ecgPhase + dEcgPhase) % 1; abpPhase = (abpPhase + dEcgPhase) % 1;
               if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; else plethPhase += dEcgPhase; if(plethPhase > 1) plethPhase = 1;
@@ -447,14 +473,27 @@ def render_monitor(disease_progress: int):
           drawWave(respData, h4*3, h4, "#ffffff", h4*0.35); 
           requestAnimationFrame(loop); 
       }}
-      requestAnimationFrame(loop);
+
+      // ================= 数值渲染逻辑 =================
       function jit(base, amt) {{ return Math.round(base + (Math.random()-0.5)*amt); }}
       function updateVitals() {{ 
-          document.getElementById('hr').textContent = jit(HR, 2); document.getElementById('spo2').textContent = jit(SPO2, 1); 
-          document.getElementById('rr').textContent = jit(RR, 1); document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); 
-          if (STATUS==="critical"||STATUS==="danger") {{ document.getElementById('hr').classList.add('blink'); }} else {{ document.getElementById('hr').classList.remove('blink'); }}
-      updateVitals(); setInterval(updateVitals, 1000);
+          document.getElementById('hr').textContent = jit(HR, 2); 
+          document.getElementById('spo2').textContent = jit(SPO2, 1); 
+          document.getElementById('rr').textContent = jit(RR, 1); 
+          document.getElementById('bp').textContent = jit(BP_SYS, 2) + "/" + jit(BP_DIA, 1); 
+          if (STATUS==="critical"||STATUS==="danger") { 
+              document.getElementById('hr').classList.add('blink'); 
+          } else { 
+              document.getElementById('hr').classList.remove('blink'); 
+          }
+      }}
+      
+      // 启动
+      updateVitals(); 
+      setInterval(updateVitals, 1000);
+      requestAnimationFrame(loop);
     </script></body></html>"""
+    
     components.html(html_code, height=290, scrolling=False)
 
 def _try_unlock(key: str):
