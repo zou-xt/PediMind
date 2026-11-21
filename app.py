@@ -341,25 +341,22 @@ def render_monitor(disease_progress: int):
       body {{ background:#000; overflow:hidden; font-family:'Courier New',monospace; display:flex; justify-content:center; }}
       .monitor {{ position:relative; width:100%; max-width: 480px; height:280px; background:#000; border-radius:6px; border:2px solid #222; overflow:hidden; display:flex; box-shadow: inset 0 0 20px rgba(0,0,0,0.9); }}
       
-      /* 波形区域 */
       .wave-area {{ flex: 1; position: relative; background:#050505; min-width: 0; }} 
       canvas {{ display:block; width:100%; height:100%; }}
       
-      /* 右侧数值面板 */
       .vitals {{ width: 120px; background: #000; padding: 12px 10px; display: flex; flex-direction: column; justify-content: space-between; border-left: 1px solid #222; flex-shrink: 0; }}
       .vital-item {{ display: flex; flex-direction: column; align-items: flex-start; line-height: 1; padding-bottom: 4px; }}
       .vital-label {{ font-size: 12px; font-weight: bold; margin-bottom: 2px; letter-spacing: 1px; }}
       .vital-value {{ font-size: 32px; font-weight: bold; font-family: 'Arial', sans-serif; line-height: 1.1; }}
       .vital-unit  {{ font-size: 10px; color: #666; margin-top: 2px; }}
       
-      /* 颜色定义 */
       .c-green {{ color:#00ff00; text-shadow: 0 0 8px rgba(0,255,0,0.4); }} 
       .c-red   {{ color:#ff3333; text-shadow: 0 0 8px rgba(255,51,51,0.4); }}
       .c-yellow{{ color:#ffff00; text-shadow: 0 0 8px rgba(255,255,0,0.4); }}
       .c-white {{ color:#ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.4); }}
       
-      .blink {{ animation:blink 0.8s infinite; }} 
-      @keyframes blink {{ 50% {{ opacity:0.3; }} }}
+      .blink {{ animation:blink 0.6s infinite; }} 
+      @keyframes blink {{ 50% {{ opacity:0.2; }} }}
     </style></head><body>
     <div class="monitor">
       <div class="wave-area"><canvas id="monitorCanvas"></canvas></div>
@@ -394,46 +391,98 @@ def render_monitor(disease_progress: int):
 
       const resizeObserver = new ResizeObserver(entries => {{
           for (let entry of entries) {{
-              W = entry.contentRect.width;
-              H = entry.contentRect.height;
+              W = entry.contentRect.width; H = entry.contentRect.height;
               if(W === 0 || H === 0) continue;
-              canvas.width = W * devicePixelRatio; 
-              canvas.height = H * devicePixelRatio; 
-              canvas.style.width = W + 'px';
-              canvas.style.height = H + 'px';
+              canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio; 
+              canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
               ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); 
           }}
       }});
       resizeObserver.observe(canvas.parentElement);
 
+      // 全局节拍计数器，用于生成期前收缩等异常
+      let beatCount = 0;
+
+      // ================= 动态波形算法 =================
+      // ECG：根据状态改变形态
       function ecgSample(p) {{ 
           let v = 0; 
-          if (p > 0.1 && p < 0.18) v += 0.15 * Math.sin((p - 0.1) / 0.08 * Math.PI);
-          if (p > 0.22 && p < 0.24) v -= 0.15; 
-          if (p > 0.24 && p < 0.26) v += 1.0;  
-          if (p > 0.26 && p < 0.28) v -= 0.25; 
-          if (p > 0.35 && p < 0.55) v += 0.25 * Math.sin((p - 0.35) / 0.2 * Math.PI); 
+          // P波
+          v += 0.1 * Math.exp(-Math.pow((p - 0.15) / 0.02, 2)); 
+          
+          // 模拟异常早搏 (仅在 critical 时出现)
+          let isPVC = false;
+          if (STATUS === "critical") {{
+              // 每 4-5 个心动周期出现一次宽大畸形的早搏
+              if (beatCount % 5 === 0 && p < 0.4) {{ isPVC = true; }}
+          }}
+
+          if (isPVC) {{
+              // 宽大畸形的 PVC 波
+              v -= 0.5 * Math.exp(-Math.pow((p - 0.25) / 0.04, 2));
+              v += 1.5 * Math.exp(-Math.pow((p - 0.3) / 0.05, 2));
+              v -= 0.4 * Math.exp(-Math.pow((p - 0.4) / 0.06, 2));
+          }} else {{
+              // 正常的 QRS 波
+              v -= 0.15 * Math.exp(-Math.pow((p - 0.26) / 0.006, 2)); 
+              v += 1.2 * Math.exp(-Math.pow((p - 0.28) / 0.008, 2)); 
+              v -= 0.3 * Math.exp(-Math.pow((p - 0.30) / 0.01, 2)); 
+              
+              // T波：在 danger 时变平，critical 时倒置
+              let tAmp = 0.25;
+              if (STATUS === "danger") tAmp = 0.1;
+              if (STATUS === "critical") tAmp = -0.15;
+              v += tAmp * Math.exp(-Math.pow((p - 0.45) / 0.05, 2)); 
+          }}
           return v; 
       }}
+      
+      // ABP：灌注差时波形变低平
       function abpSample(p) {{
-          if (p < 0.15) return Math.sin((p / 0.15) * Math.PI / 2); 
-          if (p >= 0.15 && p < 0.3) return 0.8 + 0.2 * Math.sin(((p - 0.15) / 0.15) * Math.PI / 2); 
-          if (p >= 0.3 && p < 0.4) return 1.0 - 0.3 * Math.sin(((p - 0.3) / 0.1) * Math.PI); 
-          return Math.max(0, 0.7 - ((p - 0.4) / 0.6) * 0.7); 
-      }}
-      function plethSample(p) {{ return Math.exp(-Math.pow((p - 0.25) / 0.1, 2)) + Math.exp(-Math.pow((p - 0.55) / 0.12, 2)) * 0.3; }}
-      function respSample(p) {{ return Math.sin(p * Math.PI * 2); }}
+          let amp = 1.0;
+          let notch = 0.15;
+          if (STATUS === "danger") {{ amp = 0.6; notch = 0.05; }} // 脉压差减小
+          if (STATUS === "critical") {{ amp = 0.2; notch = 0; }} // 休克低灌注，波形平坦
 
-      const BUFFER = 500; 
+          let v;
+          if (p < 0.15) v = Math.sin((p / 0.15) * Math.PI / 2);
+          else if (p < 0.4) v = 1.0 - (p - 0.15) * 1.2 + notch * Math.exp(-Math.pow((p - 0.35) / 0.03, 2)); 
+          else v = 0.7 - (p - 0.4) * 0.8;
+          return v * amp;
+      }}
+      
+      // SpO2：缺氧时波幅变小，信号变差
+      function plethSample(p) {{ 
+          let amp = 1.0;
+          let noise = 0;
+          if (STATUS === "danger") {{ amp = 0.5; }}
+          if (STATUS === "critical") {{ amp = 0.15; noise = (Math.random()-0.5)*0.1; }} // 极度微弱且带毛刺
+          
+          let v = (Math.exp(-Math.pow((p - 0.2) / 0.06, 2)) + 0.4 * Math.exp(-Math.pow((p - 0.45) / 0.08, 2))) * amp;
+          return v + noise; 
+      }}
+      
+      // RESP：濒危时呼吸极度不规则
+      function respSample(p) {{ 
+          let v = Math.sin(p * Math.PI * 2 - Math.PI / 2); 
+          if (STATUS === "critical") {{
+              // 潮式呼吸/叹息样呼吸
+              v = v * 0.5 + 0.5 * Math.sin(p * Math.PI * 0.3) * Math.sin(p * Math.PI * 2); 
+          }} else if (STATUS === "danger") {{
+              v = v * 0.7; // 呼吸变浅
+          }}
+          return v; 
+      }}
+
+      const BUFFER = 600; 
       const ecgData = new Array(BUFFER).fill(0);
       const abpData = new Array(BUFFER).fill(0);
       const plethData = new Array(BUFFER).fill(0);
       const respData = new Array(BUFFER).fill(0);
       
       let ecgPhase = 0, abpPhase = 0, plethPhase = 0, respPhase = 0; 
-      const cycleDur = 60 / HR, sampleInterval = 0.008, perFrame = 2;
-      const dEcgPhase = (sampleInterval / cycleDur) * perFrame;
-      const dRespPhase = (sampleInterval / (60 / RR)) * perFrame;
+      const sampleInterval = 4; 
+      let lastTime = performance.now();
 
       function drawGrid(h4) {{ 
           ctx.lineWidth = 0.5; 
@@ -443,29 +492,75 @@ def render_monitor(disease_progress: int):
       }}
 
       function drawWave(data, h_offset, h_region, color, amp) {{ 
-          const step = W / BUFFER; const midY = h_offset + h_region * 0.6; 
-          ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.0; ctx.lineJoin = 'round'; ctx.shadowBlur = 4; ctx.shadowColor = color; 
-          for (let i=0; i<BUFFER; i++) {{ const x = i*step, y = midY - data[i]*amp; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }} 
+          const step = W / BUFFER; 
+          const midY = h_offset + h_region * 0.55; 
+          ctx.beginPath(); 
+          ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.shadowBlur = 5; ctx.shadowColor = color; 
+          for (let i=0; i<BUFFER; i++) {{ 
+              const x = i*step, y = midY - data[i]*amp; 
+              i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); 
+          }} 
           ctx.stroke(); ctx.shadowBlur = 0; 
       }}
 
       function loop() {{ 
           if (!W || !H) {{ requestAnimationFrame(loop); return; }}
 
-          for (let k=0; k<perFrame; k++) {{ 
-              ecgPhase = (ecgPhase + dEcgPhase) % 1; abpPhase = (abpPhase + dEcgPhase) % 1;
-              if (ecgPhase < dEcgPhase * 1.5) plethPhase = 0; else plethPhase += dEcgPhase; if(plethPhase > 1) plethPhase = 1;
-              respPhase = (respPhase + dRespPhase) % 1; 
-              let v_ecg = ecgSample(ecgPhase); let v_abp = abpSample(abpPhase);
-              if (STATUS==="danger"||STATUS==="critical") {{ v_ecg += (Math.random()-0.5)*0.08; v_abp += (Math.random()-0.5)*0.05; }}
-              ecgData.push(v_ecg); ecgData.shift(); abpData.push(v_abp); abpData.shift();
-              plethData.push(plethSample(plethPhase)); plethData.shift(); respData.push(respSample(respPhase)); respData.shift(); 
+          const now = performance.now();
+          let dt = now - lastTime; lastTime = now;
+          if (dt > 100) dt = 100; 
+
+          let pointsToAdd = Math.floor(dt / sampleInterval);
+          if (pointsToAdd > 50) pointsToAdd = 50; 
+
+          const cycleDurECG = 60 / HR, cycleDurResp = 60 / RR;
+          const dPhaseECG = (sampleInterval / 1000) / cycleDurECG;
+          const dPhaseResp = (sampleInterval / 1000) / cycleDurResp;
+
+          // 更新波形数据
+          for (let i = 0; i < pointsToAdd; i++) {{ 
+              let prevPhase = ecgPhase;
+              ecgPhase = (ecgPhase + dPhaseECG) % 1; 
+              abpPhase = (abpPhase + dPhaseECG) % 1;
+              plethPhase = (plethPhase + dPhaseECG) % 1;
+              respPhase = (respPhase + dPhaseResp) % 1; 
+
+              // 每次心跳循环结束时，节拍计数器 +1
+              if (ecgPhase < prevPhase) beatCount++;
+
+              let v_ecg = ecgSample(ecgPhase); 
+              let v_abp = abpSample(abpPhase);
+              let v_pleth = plethSample(plethPhase);
+              let v_resp = respSample(respPhase);
+
+              // 危急情况下的基线漂移和干扰
+              if (STATUS === "warn") {{
+                  v_ecg += Math.sin(respPhase * Math.PI * 2) * 0.05; // 呼吸基线干扰
+              }} else if (STATUS === "danger") {{
+                  v_ecg += Math.sin(respPhase * Math.PI * 2) * 0.1 + (Math.random()-0.5)*0.05; 
+                  v_abp += (Math.random()-0.5)*0.02;
+              }} else if (STATUS === "critical") {{
+                  v_ecg += Math.sin(respPhase * Math.PI * 2) * 0.3 + (Math.random()-0.5)*0.1; // 剧烈基线游走
+                  v_abp += (Math.random()-0.5)*0.05;
+              }}
+
+              ecgData.push(v_ecg); ecgData.shift(); 
+              abpData.push(v_abp); abpData.shift();
+              plethData.push(v_pleth); plethData.shift(); 
+              respData.push(v_resp); respData.shift(); 
           }} 
-          ctx.clearRect(0,0,W,H); const h4 = H / 4; drawGrid(h4); 
-          drawWave(ecgData, 0, h4, "#00ff00", h4*0.4);   
-          drawWave(abpData, h4, h4, "#ff3333", h4*0.4);  
-          drawWave(plethData, h4*2, h4, "#ffff00", h4*0.4); 
-          drawWave(respData, h4*3, h4, "#ffffff", h4*0.35); 
+          
+          ctx.clearRect(0,0,W,H); 
+          const h4 = H / 4; 
+          drawGrid(h4); 
+          
+          // 根据病情调整波形振幅显示
+          let ampScale = STATUS === "critical" ? 0.8 : 1.0;
+          drawWave(ecgData, 0, h4, "#00ff00", h4*0.35*ampScale);   
+          drawWave(abpData, h4, h4, "#ff3333", h4*0.35*ampScale);  
+          drawWave(plethData, h4*2, h4, "#ffff00", h4*0.35*ampScale); 
+          drawWave(respData, h4*3, h4, "#ffffff", h4*0.35*ampScale); 
+          
           requestAnimationFrame(loop); 
       }}
 
