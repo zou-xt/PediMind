@@ -948,7 +948,7 @@ if st.session_state.screen == "game":
                                         st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                         system_prompt = build_parent_prompt(case, st.session_state.trust_score, st.session_state.disease_progress, st.session_state.unlocked_clues, is_furious)
                                         calm_prompt = system_prompt + f"\n\n【本轮特殊指令】医生刚刚安慰了你（原话：{prompt}）。你被触动了，情绪稍微平复，哽咽着回应一句，不超过 25 字。"
-                                        try:
+                                        try: 
                                             r = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "system", "content": calm_prompt}], temperature=0.9, max_tokens=40)
                                             reply = r.choices[0].message.content.strip()
                                         except Exception: reply = "（家属愣了一下，情绪稍微平复了一些）：“医生……谢谢您，求您一定救救孩子……”"
@@ -988,7 +988,6 @@ if st.session_state.screen == "game":
                                                 if is_furious: st.session_state.messages.append({"role": "assistant", "content": f"（家属正在发火，但你敏锐地捕捉到了关键信息：{clue}）"})
                                                 explanation = CLUE_EXPLANATIONS.get(clue, "发现了一个关键临床体征。")
                                                 st.toast(f"📖 解锁线索：{clue}\n{explanation}", icon="📚")
-                                    # 🌟 核心修复：改为全局刷新，让线索夹和心电图同步更新
                                     st.rerun()
 
                         elif st.session_state.time_period == 2:
@@ -1013,10 +1012,10 @@ if st.session_state.screen == "game":
                                     st.session_state.messages.append({"role": "assistant", "content": "（就在你思考的瞬间，患儿突发严重的呼吸困难！）"})
                                     st.rerun()
 
-                                                elif st.session_state.time_period == 3:
+                        elif st.session_state.time_period == 3:
                             if st.session_state.crisis_correct_count >= 2:
                                 st.success("🎉 患儿症状明显缓解，生命体征趋于平稳！抢救成功！")
-                                if st.button("✅ 抢救成功，进入结案复盘", use_container_width=True, type="primary"):
+                                if st.button("✅ 抢救成功，进入结案复盘", key="crisis_success_center", use_container_width=True, type="primary"):
                                     st.session_state.score_emergency += 20
                                     st.session_state.time_period = 4
                                     st.session_state.game_over = True
@@ -1027,9 +1026,8 @@ if st.session_state.screen == "game":
                             elapsed = time.time() - st.session_state.crisis_start_time
                             time_left = max(0, 90 - int(elapsed))
                             
-                            # ================= 新增：真实的倒计时和超时自动提交 =================
+                            # ================= 真实的倒计时 =================
                             if time_left > 0:
-                                # 前端显示的倒计时
                                 st.markdown(f'''
                                     <div style="background-color: #fee2e2; color: #ef4444; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 15px;">
                                         ⏰ 紧急抢救倒计时：<span id="timer">{time_left}</span> 秒！请立即选择：
@@ -1041,7 +1039,6 @@ if st.session_state.screen == "game":
                                             if(timeleft <= 0){{
                                                 clearInterval(downloadTimer);
                                                 document.getElementById("timer").innerHTML = "0";
-                                                // 超时后，强制点击隐藏按钮触发页面刷新
                                                 document.getElementById("timeout_trigger").click();
                                             }} else {{
                                                 document.getElementById("timer").innerHTML = timeleft;
@@ -1050,28 +1047,19 @@ if st.session_state.screen == "game":
                                     </script>
                                 ''', unsafe_allow_html=True)
                                 
-                                # 隐藏的超时触发按钮
+                                # 隐藏超时按钮
+                                st.markdown("""<style>div[data-testid="stButton"]:has(button[key="timeout_trigger"]) {display: none;}</style>""", unsafe_allow_html=True)
                                 if st.button("timeout", key="timeout_trigger"):
                                     st.session_state.disease_progress = 100
                                     st.session_state.game_over = True
                                     st.session_state.penalty_log.append("抢救超时，未能及时干预")
                                     st.rerun()
-                                
-                                # 用 CSS 把触发按钮隐藏掉
-                                st.markdown("""
-                                    <style>
-                                        div[data-testid="stButton"]:has(button[key="timeout_trigger"]) {
-                                            display: none;
-                                        }
-                                    </style>
-                                """, unsafe_allow_html=True)
                             else:
-                                # 如果后端代码运行时发现已经超时了
                                 st.session_state.disease_progress = 100
                                 st.session_state.game_over = True
                                 st.session_state.penalty_log.append("抢救超时")
                                 st.rerun()
-                            # ======================================================================
+                            # ====================================================
 
                             if st.session_state.action_points > 0:
                                 for opt_key, opt_val in case["crisis"].items():
@@ -1081,7 +1069,6 @@ if st.session_state.screen == "game":
                                         st.session_state.messages.append({"role": "assistant", "content": opt_val["reply"]})
                                         st.session_state.disease_progress = max(0, min(100, st.session_state.disease_progress + opt_val["disease"]))
                                         
-                                        # 增加时间惩罚：每次做错选项扣 10 秒，正确选项扣 5 秒
                                         time_penalty = 5 if opt_val["type"] == "correct" else 10
                                         st.session_state.crisis_start_time -= time_penalty
                                         
@@ -1103,7 +1090,6 @@ if st.session_state.screen == "game":
                                         st.session_state.disease_progress = 100
                                         st.session_state.game_over = True
                                     st.rerun()
-
             chat_interface()
             
     # ================= 第四幕：结案复盘 =================
