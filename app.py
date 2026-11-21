@@ -242,22 +242,28 @@ if "player_id" not in st.session_state:
         st.session_state.player_id = str(uuid.uuid4())[:8]
         st.query_params["pid"] = st.session_state.player_id
 
-# 全局字体 & 修正输入框样式的 CSS
+# 全局字体 & 针对聊天框内部组件的特殊 CSS
 FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');"
 
-# 针对聊天框内部组件的特殊 CSS
 CHAT_SPECIFIC_CSS = """
 <style>
-/* 去除 st.chat_input 底部的默认留白和灰色背景，让它完美贴入聊天卡片内部 */
-div[data-testid="stBottom"] > div {
-    background-color: transparent !important;
-    padding-bottom: 0px !important;
-}
-/* 把快捷问诊的按钮改小一点，让它像小标签 */
+/* 把输入框和快捷问诊的按钮改小一点，让它像小标签 */
 .stButton > button {
     font-size: 13px !important;
     padding: 4px 8px !important;
     border-radius: 20px !important;
+}
+/* 调整表单提交按钮的样式 */
+div[data-testid="stFormSubmitButton"] > button {
+    border-radius: 8px !important;
+    background-color: #0077b6 !important;
+    color: white !important;
+    border: none !important;
+    height: 100%;
+}
+div[data-testid="stFormSubmitButton"] > button:hover {
+    background-color: #0096c7 !important;
+    color: white !important;
 }
 </style>
 """
@@ -268,8 +274,6 @@ if st.session_state.theme == "night":
         .stApp {{ background: radial-gradient(circle at 50% 0%, #1b263b 0%, #0d1b2a 70%) !important; color: #e2e8f0 !important; }}
         p, label, h1, h2, h3, h4, h5, h6 {{ color: #e2e8f0 !important; font-family: 'Noto Sans SC', sans-serif !important; }}
         section[data-testid="stSidebar"] {{ background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%) !important; }}
-        div[data-testid="stChatInput"] {{ background-color: #ffffff !important; border-radius: 12px !important; }}
-        div[data-testid="stChatInput"] textarea {{ color: #4a5568 !important; }}
         .stButton>button {{ border-radius: 20px !important; border: 1px solid rgba(0, 180, 216, 0.4) !important; background: rgba(0, 180, 216, 0.1) !important; color: #e2e8f0 !important; }}
         .stButton>button:hover {{ background: rgba(0, 180, 216, 0.3) !important; }}
         .status-badge {{ background: rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); }}
@@ -604,7 +608,7 @@ def render_sidebar_achievements(case_id: str):
             done = f"{case_id}:{aid}" in unlocked
             cols[i].markdown(f'<div title="{html.escape(a["name"])}：{html.escape(a["desc"])}" style="text-align:center; font-size:24px; {"" if done else "filter:grayscale(1) opacity(0.35);"}">{a["icon"]}</div>', unsafe_allow_html=True)
 
-# 构建 AI 家长的系统提示词
+# 构建 AI 家长的系统提示词（核心逻辑）
 def build_parent_prompt(case, trust_score, disease_progress, unlocked_clues, is_furious):
     facts = "\n".join(f"  · {c}" for c in case["clues"])
     said = "、".join(unlocked_clues) if unlocked_clues else "（还没聊到具体细节）"
@@ -768,7 +772,7 @@ if st.session_state.screen == "game":
 
     defaults = {
         "messages": [{"role": "assistant", "content": case.get("opening_line", "医生！快看看孩子！")}],
-        "chat_history": [{"role": "assistant", "content": case.get("opening_line", "医生！快看看孩子！")}], # ✨ 新增：专门存给 LLM 的历史
+        "chat_history": [{"role": "assistant", "content": case.get("opening_line", "医生！快看看孩子！")}], # 核心新增：专门存给 LLM 的历史
         "trust_score": 40 if mode == "easy" else 20,
         "action_points": 6 if mode == "easy" else 4, 
         "disease_progress": 30, "game_over": False, "time_period": 1, "unlocked_clues": [],
@@ -1144,18 +1148,20 @@ if st.session_state.screen == "game":
         else:
             @st.fragment
             def chat_interface():
-                # ✨ 核心改动：用带边框的容器把聊天列表、输入框整体包起来
+                # 外层大卡片：包裹聊天记录、快捷按钮、输入框
                 with st.container(border=True):
                     
-                    # 1. 聊天记录区（高度适当减小，给下面的输入框留出空间）
+                    # 1. 聊天记录区（固定高度，内部滚动）
                     with st.container(height=380):
                         for msg in st.session_state.messages: 
                             render_message(msg["role"], msg["content"], case)
 
-                    # 2. 底部操作区
+                    # 2. 底部操作区（只在第一幕显示）
                     if not st.session_state.game_over:
                         if st.session_state.time_period == 1:
-                            st.markdown('<p style="font-size:14px; font-weight:bold; margin:10px 0 5px 0; color:#6b7280;">💡 快捷问诊：</p>', unsafe_allow_html=True)
+                            
+                            # 快捷问诊按钮
+                            st.markdown('<p style="font-size:13px; font-weight:bold; margin:5px 0 5px 0; color:#6b7280;">💡 快捷问诊：</p>', unsafe_allow_html=True)
                             q_cols = st.columns(3)
                             if st.session_state.current_case == "laryngitis":
                                 quick_prompts = ["咳嗽声音什么样？", "晚上更严重吗？", "少废话，赶紧办住院！"]
@@ -1167,18 +1173,26 @@ if st.session_state.screen == "game":
                                 if q_cols[i].button(q, use_container_width=True, key=f"quick_{i}"): 
                                     prompt = q
 
-                            # 输入框（放在容器最底部）
-                            chat_val = st.chat_input("输入问诊、查体要求或安抚话语...")
-                            if chat_val: 
-                                prompt = chat_val
+                            # 3. 输入框（完美嵌入卡片，支持回车发送）
+                            with st.form(key="chat_form", clear_on_submit=True):
+                                col_input, col_btn = st.columns([5.5, 1])
+                                with col_input:
+                                    chat_val = st.text_input("输入", placeholder="输入问诊、查体要求或安抚话语...", label_visibility="collapsed")
+                                with col_btn:
+                                    submitted = st.form_submit_button("发送 ➤", use_container_width=True)
                             
+                            # 如果点了发送按钮，或者按了回车
+                            if submitted and chat_val:
+                                prompt = chat_val
+
+                            # ================= 处理玩家输入 =================
                             if prompt:
                                 if st.session_state.action_points <= 0: 
                                     st.warning("体力已用完，请尽快在左侧点击【结束接诊，给出诊断】或准备急救。")
                                 else:
                                     st.session_state.action_points -= 1
                                     st.session_state.messages.append({"role": "user", "content": prompt})
-                                    st.session_state.chat_history.append({"role": "user", "content": prompt}) # ✨ 记录到 LLM 历史
+                                    st.session_state.chat_history.append({"role": "user", "content": prompt})
                                     
                                     is_furious = st.session_state.trust_score <= 15
                                     cold_words = ["闭嘴", "烦死了", "别吵", "赶紧的", "少废话", "按我说的做", "滚", "出去", "别哭了"]
@@ -1192,7 +1206,7 @@ if st.session_state.screen == "game":
                                         st.session_state.trust_score -= 30
                                         reply = "（家属瞬间暴怒）：“你什么态度！你叫谁闭嘴？我要投诉你！！”"
                                         st.session_state.messages.append({"role": "assistant", "content": reply})
-                                        st.session_state.chat_history.append({"role": "assistant", "content": reply}) # ✨
+                                        st.session_state.chat_history.append({"role": "assistant", "content": reply})
                                         if check_medical_dispute(): st.rerun()
                                     
                                     elif is_empathy:
@@ -1200,7 +1214,6 @@ if st.session_state.screen == "game":
                                         st.session_state.score_empathy += 10
                                         st.session_state.disease_progress = max(0, st.session_state.disease_progress - 5)
                                         
-                                        # ✨ 共情也由 AI 生成回复
                                         system_prompt = build_parent_prompt(case, st.session_state.trust_score, st.session_state.disease_progress, st.session_state.unlocked_clues, is_furious)
                                         calm_prompt = system_prompt + f"\n\n【本轮特殊指令】医生刚刚安慰了你（原话：{prompt}）。你被触动了，情绪稍微平复，哽咽着回应一句，不超过 25 字。"
                                         try:
@@ -1222,19 +1235,16 @@ if st.session_state.screen == "game":
                                         if check_medical_dispute(): st.rerun()
                                     else:
                                         try:
-                                            # ✨ 重写 System Prompt 并带上历史记录
                                             system_prompt = build_parent_prompt(
                                                 case, st.session_state.trust_score, st.session_state.disease_progress,
                                                 st.session_state.unlocked_clues, is_furious
                                             )
-                                            
-                                            # 带上最近 12 条历史记录作为上下文
                                             api_messages = [{"role": "system", "content": system_prompt}] + st.session_state.chat_history[-12:]
                                             
                                             response = client.chat.completions.create(
                                                 model=MODEL_NAME, 
                                                 messages=api_messages, 
-                                                temperature=0.85, # 调高温度让家长表现更自然
+                                                temperature=0.85,
                                                 top_p=0.9,
                                                 max_tokens=150,
                                                 stream=True
@@ -1253,7 +1263,7 @@ if st.session_state.screen == "game":
                                             ai_reply = "家属显得很烦躁，没有回答你的问题。" if is_furious else "医生，您快给看看，到底怎么回事啊？"
 
                                         st.session_state.messages.append({"role": "assistant", "content": ai_reply})
-                                        st.session_state.chat_history.append({"role": "assistant", "content": ai_reply}) # ✨ 加入历史
+                                        st.session_state.chat_history.append({"role": "assistant", "content": ai_reply})
                                         
                                         match_text = prompt + " " + ai_reply
                                         for clue in case["clues"]:
@@ -1349,6 +1359,7 @@ if st.session_state.screen == "game":
 
             # 调用局部刷新组件
             chat_interface()
+            
     # ================= 第四幕：结案复盘 =================
     if st.session_state.game_over:
         st.divider(); st.header("🩺 带教老师复盘")
