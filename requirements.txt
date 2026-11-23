@@ -4,3 +4,7 @@ plotly
 pandas
 qrcode
 Pillow
+langchain
+langchain-community
+chromadb
+sentence-transformers
