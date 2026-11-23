@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import streamlit.components.v1 as components
 import os, time, json, base64, html, sqlite3, uuid, re, io
@@ -10,6 +11,46 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
 
+# 🌟 引入持久化向量库依赖（无需 TextLoader, TextSplitter）
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
+# ================= RAG 配置 =================
+PERSIST_DIR = "./chroma_pedimind_guidelines"
+COLLECTION_NAME = "pedimind_guidelines"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+@st.cache_resource(show_spinner="📚 正在加载医学指南知识库...")
+def init_rag_database():
+    if not os.path.exists(PERSIST_DIR):
+        st.error(f"⚠️ 未找到本地向量库！请先在终端运行 `python build_rag_db.py` 构建知识库。")
+        return None
+    try:
+        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+        db = Chroma(
+            collection_name=COLLECTION_NAME,
+            embedding_function=embeddings,
+            persist_directory=PERSIST_DIR,
+        )
+        return db
+    except Exception as e:
+        print(f"RAG 加载失败: {e}")
+        return None
+
+rag_db = init_rag_database()
+
+# 🌟 检索函数：返回最相关的 3 段指南拼接
+def retrieve_guideline(disease_name: str, k: int = 3) -> str:
+    if not rag_db:
+        return "暂无指南数据。"
+    try:
+        results = rag_db.similarity_search(disease_name, k=k)
+        if results:
+            return "\n\n---\n\n".join([doc.page_content for doc in results])
+    except Exception as e:
+        print(f"检索失败: {e}")
+    return "指南库中未找到该疾病的详细条目。"
+    
 # ================= 1. 环境与 API =================
 os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
@@ -24,7 +65,7 @@ BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 MODEL_NAME = "glm-4-flash"
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# ================= 2. 四大预设病例 (无剧透版) =================
+# ================= 2. 四大预设病例 =================
 CASES_CONFIG = {
     "laryngitis": {
         "name": "2岁患儿的犬吠声", "disease": "急性感染性喉炎", "patient": "小雨，2岁3个月，女", "difficulty": "⭐⭐⭐⭐",
@@ -128,7 +169,6 @@ CLUE_EXPLANATIONS = {
 }
 
 def check_clue_trigger(clue: str, prompt: str) -> bool:
-    # 🚨 核心修改：把这些体征线索列为“查体专属”，聊天绝不触发！
     EXAM_ONLY_CLUES = ["三凹征", "吸气性喉鸣", "面色发绀", "呼吸音不对称", "双肺哮鸣音", "流涎", "拒绝平卧", "吞咽困难"]
     if clue in EXAM_ONLY_CLUES:
         return False 
@@ -1115,33 +1155,37 @@ if st.session_state.screen == "game":
             st.session_state.record_saved = True
 
         if not st.session_state.ai_review_generated:
-            with st.spinner("👨‍⚕️ 主治医师正在整理疾病知识点并进行查房复盘..."):
+            with st.spinner("👨‍⚕️ 主治医师正在查阅医学指南并复盘..."):
                 try:
                     missed_clues = set(case['clues']) - set(st.session_state.unlocked_clues)
                     all_clues = "、".join(case['clues'])
+                    
+                    # 🌟 RAG 检索真实的指南原文！
+                    guideline_text = retrieve_guideline(case['disease'])
+                    
                     review_prompt = f"""
                     你是一名严厉但负责的三甲医院儿科主任医师。正在进行临床带教查房复盘。你正在当面点评刚刚接诊完【{case['disease']}】的住院医（玩家）。
+                    
+                    【权威指南检索结果】：
+                    {guideline_text}
+                    
                     【本病例标准核心线索】：{all_clues}
                     【玩家漏掉的线索】：{missed_clues}
                     【玩家的操作失误】：{st.session_state.penalty_log}
-                    【核心要求】：必须全程使用第二人称“你”！绝对禁止使用“他”、“该医生”等第三人称。
-                    请用 250 字左右的医学专业口吻进行点评，必须严格按以下三个部分输出：
-                    1. 【疾病知识微课】：先花两句话简明扼要地讲解【{case['disease']}】的典型临床表现是什么，以及接诊时【最核心的问诊/查体要点】应该包含哪些。
-                    2. 【你的实战评价】：结合本病例的标准线索，一针见血地指出玩家刚才的表现（比如：你问出了什么、漏掉了什么、思维哪里不到位）。
-                    3. 【临床干预红线】：强调该病在急救或处置上绝对禁止的操作（避坑），以及首选的抢救原则。
-                    （如果玩家完美通关，也要简要复习知识点并予以肯定）。
+                    
+                    【核心要求】：必须全程使用第二人称“你”！
+                    请用 200 字左右的医学专业口吻进行点评，必须严格按以下三个部分输出：
+                    1. 【指南共识】：必须直接引用上述【权威指南检索结果】中的原话。
+                    2. 【你的实战评价】：结合标准线索，指出玩家漏掉了什么，或违反了指南的哪条禁忌。
+                    3. 【临床干预红线】：强调绝对禁止的操作与首选抢救原则。
                     """
+                    
                     res = client.chat.completions.create(model=MODEL_NAME, messages=[{"role": "user", "content": review_prompt}], temperature=0.6)
                     st.session_state.ai_review = res.choices[0].message.content
                     st.session_state.ai_review_generated = True
-                except: st.session_state.ai_review = "主任今天太忙，未能给出评语。不过，多复盘永远是进步的阶梯。"; st.session_state.ai_review_generated = True
-        
-        st.info(f"### {st.session_state.final_title}\n最终得分：{st.session_state.final_score} / 100\n\n**👨‍⚕️ 主治医师点评：**\n{st.session_state.ai_review}")
-
-        fig = go.Figure(go.Scatterpolar(r=[min(100, st.session_state.score_inquiry * 3), min(100, st.session_state.score_diagnosis * 2), min(100, st.session_state.score_emergency * 2), min(100, st.session_state.score_empathy * 2)], theta=['问诊/查体', '诊断', '急救', '沟通/人文'], fill='toself'))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), height=300)
-        st.plotly_chart(fig, use_container_width=True)
-
+                except Exception as e:
+                    st.session_state.ai_review = f"主任今天太忙，未能给出评语。错误：{e}"
+                    st.session_state.ai_review_generated = True
         st.subheader("🎓 生成专属虚拟医师执照")
         if st.button("立即生成证书"):
             try:
