@@ -1,10 +1,12 @@
 streamlit
 openai
-plotly
 pandas
+plotly
+pillow
 qrcode
-Pillow
-langchain
 langchain-community
+langchain-huggingface
+langchain-text-splitters
 chromadb
 sentence-transformers
+pymupdf
