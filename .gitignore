@@ -1,0 +1,8 @@
+# 忽略原始 PDF 文件
+*.pdf
+
+# 忽略建库脚本（线上不需要）
+build_rag_db.py
+
+# 忽略本地 SQLite 数据库（玩家的错题本记录不需要上传）
+pedimind_records.db
